@@ -34,7 +34,6 @@
 #include <xc.h> // include processor files - each processor file is guarded.  
 #define TIMER1 1
 #define TIMER2 2  
-#define TIMER_BODY 10
 
 int tmr_wait_ms(int timer, int ms);
 int choose_prescaler(int ms,int* pr,int* tckps);
