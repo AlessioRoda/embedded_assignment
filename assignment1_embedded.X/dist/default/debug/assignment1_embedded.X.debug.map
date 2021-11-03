@@ -69,17 +69,19 @@ Default Scalar Model: Small
 section                    address   length (PC units)   length (bytes) (dec)
 -------                    -------   -----------------   --------------------
 .text                        0x100                0xce           0x135  (309)
-.text                        0x1ce               0x28c           0x3d2  (978)
+.text                        0x1ce               0x318           0x4a4  (1188)
+.dinit                       0x4e6                 0x8             0xc  (12)
 
-                 Total "program" memory used (bytes):          0x507  (1287) 2%
+                 Total "program" memory used (bytes):          0x5e5  (1509) 3%
 
 
 "data" Memory  [Origin = 0x800, Length = 0x800]
 
 section                    address      alignment gaps    total length  (dec)
 -------                    -------      --------------    -------------------
+.nbss                        0x800                   0            0x14  (20)
 
-                 Total "data" memory used (bytes):              0  (0) 
+                 Total "data" memory used (bytes):           0x14  (20) <1%
 
 
 Dynamic Memory Usage
@@ -87,26 +89,42 @@ Dynamic Memory Usage
 region                     address                      maximum length  (dec)
 ------                     -------                      ---------------------
 heap                             0                                   0  (0)
-stack                        0x800                               0x800  (2048)
+stack                        0x814                               0x7ec  (2028)
 
-                 Maximum dynamic memory (bytes):          0x800  (2048)
+                 Maximum dynamic memory (bytes):          0x7ec  (2028)
 
 Info: Project is using a large data memory model when small data memory model is sufficient.
 
+
+External Symbols in Data Memory (by address):
+
+                    0x0800                  _cursor_count
+                    0x0802                  _character_count
+                    0x0804                  _string
+
+External Symbols in Data Memory (by name):
+
+                    0x0802                  _character_count
+                    0x0800                  _cursor_count
+                    0x0804                  _string
 
 External Symbols in Program Memory (by address):
 
                   0x000100                  __resetPRI
                   0x00013c                  __psv_init
-                  0x000152                  __data_init
                   0x000152                  __data_init_standard
+                  0x000152                  __data_init
                   0x0001c8                  __DefaultInterrupt
                   0x0001ce                  _choose_prescaler
                   0x0002be                  _tmr_wait_ms
                   0x00035a                  _tmr_setup_period
                   0x0003ce                  _tmr_wait_period
-                  0x000420                  _main
-                  0x00042a                  _body
+                  0x000420                  _spi_put_char
+                  0x000436                  _spi_put_string
+                  0x00045c                  _spi_move_cursor
+                  0x00048a                  _spi_clear_first_row
+                  0x0004ac                  _main
+                  0x0004b6                  _body
 
 External Symbols in Program Memory (by name):
 
@@ -115,9 +133,13 @@ External Symbols in Program Memory (by name):
                   0x000152                  __data_init_standard
                   0x00013c                  __psv_init
                   0x000100                  __resetPRI
-                  0x00042a                  _body
+                  0x0004b6                  _body
                   0x0001ce                  _choose_prescaler
-                  0x000420                  _main
+                  0x0004ac                  _main
+                  0x00048a                  _spi_clear_first_row
+                  0x00045c                  _spi_move_cursor
+                  0x000420                  _spi_put_char
+                  0x000436                  _spi_put_string
                   0x00035a                  _tmr_setup_period
                   0x0002be                  _tmr_wait_ms
                   0x0003ce                  _tmr_wait_period
@@ -249,31 +271,31 @@ userdata
 .comment
  *(.comment)
 
-.debug_info       0x000000        0xa86
+.debug_info       0x000000        0xc7b
  *(.debug_info)
- .debug_info      0x000000        0x76a build/default/debug/assignment.o
- .debug_info      0x00076a        0x31c build/default/debug/newmainXC16.o
+ .debug_info      0x000000        0x917 build/default/debug/assignment.o
+ .debug_info      0x000917        0x364 build/default/debug/newmainXC16.o
  *(.gnu.linkonce.wi.*)
 
-.debug_abbrev     0x000000        0x1da
+.debug_abbrev     0x000000        0x212
  *(.debug_abbrev)
- .debug_abbrev    0x000000        0x139 build/default/debug/assignment.o
- .debug_abbrev    0x000139         0xa1 build/default/debug/newmainXC16.o
+ .debug_abbrev    0x000000        0x14e build/default/debug/assignment.o
+ .debug_abbrev    0x00014e         0xc4 build/default/debug/newmainXC16.o
 
-.debug_line       0x000000        0x273
+.debug_line       0x000000        0x28b
  *(.debug_line)
- .debug_line      0x000000        0x162 build/default/debug/assignment.o
- .debug_line      0x000162        0x111 build/default/debug/newmainXC16.o
+ .debug_line      0x000000        0x179 build/default/debug/assignment.o
+ .debug_line      0x000179        0x112 build/default/debug/newmainXC16.o
 
-.debug_frame      0x000000         0xce
+.debug_frame      0x000000        0x136
  *(.debug_frame)
- .debug_frame     0x000000         0x86 build/default/debug/assignment.o
- .debug_frame     0x000086         0x48 build/default/debug/newmainXC16.o
+ .debug_frame     0x000000         0xee build/default/debug/assignment.o
+ .debug_frame     0x0000ee         0x48 build/default/debug/newmainXC16.o
 
-.debug_str        0x000000         0x2c
+.debug_str        0x000000         0x39
  *(.debug_str)
- .debug_str       0x000000         0x23 build/default/debug/assignment.o
- .debug_str       0x000023          0x9 build/default/debug/newmainXC16.o
+ .debug_str       0x000000         0x30 build/default/debug/assignment.o
+ .debug_str       0x000030          0x9 build/default/debug/newmainXC16.o
 
 .debug_loc
  *(.debug_loc)
@@ -282,12 +304,12 @@ userdata
  *(.debug_macinfo)
 
 .debug_pubnames
-                  0x000000         0x84
+                  0x000000        0x104
  *(.debug_pubnames)
  .debug_pubnames
-                  0x000000         0x60 build/default/debug/assignment.o
+                  0x000000         0xb0 build/default/debug/assignment.o
  .debug_pubnames
-                  0x000060         0x24 build/default/debug/newmainXC16.o
+                  0x0000b0         0x54 build/default/debug/newmainXC16.o
 
 .debug_ranges
  *(.debug_ranges)
@@ -1007,31 +1029,45 @@ LOAD c:/program files/microchip/xc16/v1.70/bin/bin/../../lib\liblega-c-elf.a
 END GROUP
 OUTPUT(dist/default/debug/assignment1_embedded.X.debug.elf elf32-pic30)
 LOAD default_isr
+LOAD data_init
 
 .debug_pubtypes
-                  0x000030         0xb6
+                  0x000030         0xdb
  .debug_pubtypes
-                  0x000030         0x7a build/default/debug/assignment.o
+                  0x000030         0x9f build/default/debug/assignment.o
  .debug_pubtypes
-                  0x0000aa         0x3c build/default/debug/newmainXC16.o
+                  0x0000cf         0x3c build/default/debug/newmainXC16.o
 
 __c30_signature
-                  0x0000e6         0x18
+                  0x00010b         0x18
  __c30_signature
-                  0x0000e6          0x6 build/default/debug/assignment.o
+                  0x00010b          0x6 build/default/debug/assignment.o
  __c30_signature
-                  0x0000ec          0x6 build/default/debug/newmainXC16.o
+                  0x000111          0x6 build/default/debug/newmainXC16.o
  __c30_signature
-                  0x0000f2          0x6 c:/program files/microchip/xc16/v1.70/bin/bin/../../lib\liblega-pic30-elf.a(crt0_standard.o)
+                  0x000117          0x6 c:/program files/microchip/xc16/v1.70/bin/bin/../../lib\liblega-pic30-elf.a(crt0_standard.o)
  __c30_signature
-                  0x0000f8          0x6 c:/program files/microchip/xc16/v1.70/bin/bin/../../lib\liblega-pic30-elf.a(data_init_standard.o)
+                  0x00011d          0x6 c:/program files/microchip/xc16/v1.70/bin/bin/../../lib\liblega-pic30-elf.a(data_init_standard.o)
 
-.text             0x0001ce        0x28c
- .text            0x0001ce        0x252 build/default/debug/assignment.o
+.nbss               0x0800         0x14
+ .nbss              0x0800         0x14 build/default/debug/newmainXC16.o
+                    0x0800                  _cursor_count
+                    0x0802                  _character_count
+                    0x0804                  _string
+
+.text             0x0001ce        0x318
+ .text            0x0001ce        0x2de build/default/debug/assignment.o
                   0x0001ce                  _choose_prescaler
                   0x0002be                  _tmr_wait_ms
                   0x00035a                  _tmr_setup_period
                   0x0003ce                  _tmr_wait_period
- .text            0x000420         0x3a build/default/debug/newmainXC16.o
-                  0x000420                  _main
-                  0x00042a                  _body
+                  0x000420                  _spi_put_char
+                  0x000436                  _spi_put_string
+                  0x00045c                  _spi_move_cursor
+                  0x00048a                  _spi_clear_first_row
+ .text            0x0004ac         0x3a build/default/debug/newmainXC16.o
+                  0x0004ac                  _main
+                  0x0004b6                  _body
+
+.dinit            0x0004e6          0x8
+ .dinit           0x0004e6          0x8 data_init
