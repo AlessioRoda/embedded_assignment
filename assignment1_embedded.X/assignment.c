@@ -1,27 +1,38 @@
-
+/*
+ * File:   main.c
+ * Authors: Ermanno Girardo, Alessio Roda, Enzo Ubaldo Petrocco
+ *
+ * Created on 26 ottobre 2021, 22.42
+ */
+////////////////////////////////////////////////////////////////////////////////
+/*
+ * This is the main file of the assignment
+ * Requisites:
+ * 1)Simulate an algorithm that needs 7 ms for its execution, and
+ *    needs to work at 100 Hz.
+ * 2)Read characters from UART and display the characters received
+ *   on the first row of the LCD.
+ * 3)When the end of the row has been reached, clear the first row
+ *   and start writing again from the first row first column
+ * 4)Whenever a CR ?nr? or LF ?nn? character is received, clear the first
+ *    row
+ * 5)On the second row, write ?Char Recv: XXX?, where XXX is the
+ *   number of characters received from the UART2.
+ * 6)Whenever button S5 is pressed, send the current number of chars
+ *   received to UART2
+ * 7)Whenever button S6 is pressed, clear the first row and reset the
+ *   characters received counter
+ */
+////////////////////////////////////////////////////////////////////////////////
 
 
 
 #include "xc.h"
 #include "assignment.h"
 #include <stdio.h>
-#include <stdlib.h>
-//#include "p30F1010.h"
 
-/*
-void spi_put_char(char c){
-    //polling until SPI buffer ready
-    while(SPI1STATbits.SPITBF == 1); 
-    SPI1BUF = c;
-}
 
-void spi_put_string(char* str){
-    for(int i=0;str[i] != '\0';i++){
-        spi_put_char(str[i]);
-    }
-}
-*/
-
+//function used to set the prescaler
 int choose_prescaler(int ms,int* pr,int* tckps)
 {
     long ticks= (7372800/4L)/1000L*ms; //clock freql
@@ -59,7 +70,7 @@ int choose_prescaler(int ms,int* pr,int* tckps)
     return 1;
 }
 
-
+//set and wait into the same function
 int tmr_wait_ms(int timer, int ms)
 {
     switch (timer){
@@ -104,7 +115,7 @@ int tmr_wait_ms(int timer, int ms)
 }
 
 
-
+//function used to set timer for a specific time in ms
 void tmr_setup_period(int timer,int ms)
 {
 
@@ -138,13 +149,13 @@ void tmr_setup_period(int timer,int ms)
 
 
 
-
+//once setted the timer wait for the flag
 int tmr_wait_period(int timer)
 {
     switch(timer){
     case TIMER1:
     {
-        if(IFS0bits.T1IF==1){ //If when enter the timer is alreadu expires
+        if(IFS0bits.T1IF==1){ //If when enter the timer is already expires
         IFS0bits.T1IF=0; //Set the flag to zero and return error
         return 1;
         }
@@ -164,4 +175,40 @@ int tmr_wait_period(int timer)
     }
     }
     return 0;
+}
+
+
+//function to put a character into SPI
+void spi_put_char(char c){
+    while(SPI1STATbits.SPITBF == 1); //polling until SPI buffer ready
+    SPI1BUF = c;
+}
+
+
+//Function to put a sring into SPI 
+void spi_put_string(char* str){
+    int i;
+    for( i=0;str[i] != '\0';i++){
+        spi_put_char(str[i]);
+    }
+}
+void spi_move_cursor(int row, int column){
+    switch(row){
+        case 0:{
+            spi_put_char(0x80 + column);
+            return;
+        }
+        case 1:{
+            spi_put_char(0xC0 + column);
+            return;
+        }
+    }
+}
+
+void spi_clear_first_row(){
+    spi_move_cursor(FIRST_ROW, 0);
+    int i=0;
+    for(i=0;i<16;i++){
+        spi_put_char(' ');
+    }
 }

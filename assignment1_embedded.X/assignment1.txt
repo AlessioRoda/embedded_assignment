@@ -1,0 +1,7 @@
+05
+
+wait 10 ms
+
+\r
+
+"This is the text file of the assignment"
