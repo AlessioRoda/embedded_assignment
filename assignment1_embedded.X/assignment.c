@@ -59,7 +59,7 @@ int choose_prescaler(int ms,int* pr,int* tckps)
         *pr=ticks;
         return 0;
     }
-    //prescaler 256
+    //prescaler 1:256
     ticks=ticks_no_presc/256;
     if(ticks<=65535)
     {
