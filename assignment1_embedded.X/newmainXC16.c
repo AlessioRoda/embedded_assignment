@@ -1,6 +1,6 @@
 /*
  * File:   main.c
- * Author: Alessio
+ * Author: Alessio Roda, Enzo  Ubaldo Petrocco, Ermanno Girardo
  *
  * Created on 27 ottobre 2021, 22.49
  */
@@ -8,9 +8,7 @@
 
 #include "xc.h"
 #include <stdio.h>
-#include <stdbool.h>
 #include <stdlib.h>
-#include "p30F4011.h"
 #include "assignment.h"
 
 #define FIRST_ROW 0
@@ -26,7 +24,7 @@ int buff[30]; //Circular buffer
 int* W10 = (int*)&buff; //W10 points to the first element of buff
 int* R10 = (int*)&buff; //R10 points to the first element of buff, to read the buffer
 
-bool buttonS6 = false;
+int buttonS6flag = 0;
 
 
 //ISR for the UART2 
@@ -52,8 +50,9 @@ void __attribute__((__interrupt__,__auto_psv__)) _INT0Interrupt(){
 void __attribute__((__interrupt__,__auto_psv__)) _INT1Interrupt(){
     IFS1bits.INT1IF = 0; //turn off the flag
     //clear the first row
-    spi_clear_first_row();
+    //spi_clear_first_row();
     //reset the character counter
+    buttonS6flag = 1;
     character_count = 0;
 }
 
@@ -64,15 +63,15 @@ int main(void) {
     tmr_wait_ms(TIMER1, 1000);
     
     ////////////////INITIALIZATION//////////////////////////////////////////////
-    int i; //Index buffer
-    TRISD = 0;
-    for(i = 0;i <= 29;i++) //Init buff
-    buff[i] = NULL; 
-    
-    YMODSRT = (int)&buff; //YMODSRT points to the first element of buff
-    YMODEND = (int)&buff+59; //YMODEND points to the end address of buff
-    MODCON = (int)0x80AA; //Moduo address Y space
-    
+    int i; //Index buffer                                                     //
+    TRISD = 0;                                                                //
+    for(i = 0;i <= 29;i++) //Init buff                                        //
+    buff[i] = NULL;                                                           //
+                                                                              //
+    YMODSRT = (int)&buff; //YMODSRT points to the first element of buff       //
+    YMODEND = (int)&buff+59; //YMODEND points to the end address of buff      //
+    MODCON = (int)0x80AA; //Modulo address Y space                            //
+                                                                              //
     //I/O initilizationfor buttons S5 S6                                      //
     TRISEbits.TRISE8 = 1; //button S5 as input                                //
     TRISDbits.TRISD0 = 1; //button S6 as input                                //                                                    //
@@ -84,7 +83,7 @@ int main(void) {
     SPI1CONbits.MODE16 = 0; // 8 bits                                         //
     SPI1STATbits.SPIEN = 1; // enable                                         //
                                                                               //
-                                                                              //                              //
+                                                                              //                              
                                                                               //
     //UART2 Initialization                                                    //
                                                                               //             
@@ -116,18 +115,19 @@ int main(void) {
         
         IEC1bits.U2RXIE = 0; //Disable interrupt UART2
         
+        //Read the circular buffer
         for(;R10<=W10; R10++)
         {
+            char character = (char)*R10;
             spi_move_cursor(FIRST_ROW,cursor_count);
-                //if is received the two special character clear the first row
-            if((*R10=='\r') || (*R10=='\n') || (cursor_count==15)){
+            //if is received the two special character clear the first row
+            if((character=='\r') || (character=='\n') || (cursor_count==15)){
                 spi_clear_first_row();
                 cursor_count=0;
             }
 
-            
-            else if(*R10!=NULL){
-                char character = (char)*R10;
+            //else write on SPI
+            else if(character != NULL){
                 spi_put_char(character);  //write the character on SPI
                 cursor_count++;
                   
@@ -140,7 +140,14 @@ int main(void) {
         sprintf(string,"%d",character_count);
         //then the number of character received
         spi_put_string(string);
-              
+        //if the button S6 is pressed
+        if(buttonS6flag==1){
+            //clear the first row
+            spi_clear_first_row();
+            //reset the status
+            buttonS6flag = 0;
+        }
+        //enable interrupt UART2      
         IEC1bits.U2RXIE = 1;
                
         tmr_wait_period(TIMER1);
