@@ -8,6 +8,7 @@
 
 #include "xc.h"
 #include <stdio.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include "p30F4011.h"
 #include "assignment.h"
@@ -21,43 +22,23 @@ int cursor_count=0;
 int character_count=0;
 //string global variable
 char string[16];
+int buff[30]; //Circular buffer
+int* W10 = (int*)&buff; //W10 points to the first element of buff
+int* R10 = (int*)&buff; //R10 points to the first element of buff, to read the buffer
 
+bool buttonS6 = false;
 
-//ISR for the UART
-void __attribute__((__interrupt__,__auto_psv__)) _U1RXInterrupt(){
-    IFS0bits.U1RXIF = 0; //turn off the flag
-    spi_move_cursor(FIRST_ROW,cursor_count);
-    char c = U1RXREG; //take data from UART register
-    //if is received the two special character clear the first row
-    if((c=='\r') || (c=='\n')){
-        spi_clear_first_row();
-        cursor_count=0;
-    }
-    else{
-        spi_put_char(c);  //write the character on SPI
-        cursor_count++;
-    }
-    //if the end of the first row has been reached
-    if(cursor_count==15){
-        //clear the first row
-        spi_clear_first_row();
-        //uppdate the counter
-        cursor_count=0;
-        //move the cursor into the fisrt row first column
-        spi_move_cursor(FIRST_ROW,0);
-    }
-}
 
 //ISR for the UART2 
 void __attribute__((__interrupt__,__auto_psv__)) _U2RXInterrupt(){
     IFS1bits.U2RXIF = 0; //turn off the flag
     character_count++;
-    //move the cursor in second row first column
-    spi_move_cursor(SECOND_ROW,11);
-    //write "Char Recv:"
-    sprintf(string,"%d",character_count);
-    //then the number of character received
-    spi_put_string(string);
+    
+    //Take the character from the UART2 buffer
+    char c = U2RXREG; //take data from UART register
+    //Put into circular buffer
+    *W10=(int)c;
+    W10++;
 }
 
 //ISR when the button S5 is pressed
@@ -80,9 +61,18 @@ void __attribute__((__interrupt__,__auto_psv__)) _INT1Interrupt(){
 int main(void) {
    
     //first need to wait 1 second
-    //tmr_wait_ms(TIMER1, 1000);
+    tmr_wait_ms(TIMER1, 1000);
     
     ////////////////INITIALIZATION//////////////////////////////////////////////
+    int i; //Index buffer
+    TRISD = 0;
+    for(i = 0;i <= 29;i++) //Init buff
+    buff[i] = NULL; 
+    
+    YMODSRT = (int)&buff; //YMODSRT points to the first element of buff
+    YMODEND = (int)&buff+59; //YMODEND points to the end address of buff
+    MODCON = (int)0x80AA; //Moduo address Y space
+    
     //I/O initilizationfor buttons S5 S6                                      //
     TRISEbits.TRISE8 = 1; //button S5 as input                                //
     TRISDbits.TRISD0 = 1; //button S6 as input                                //                                                    //
@@ -94,14 +84,7 @@ int main(void) {
     SPI1CONbits.MODE16 = 0; // 8 bits                                         //
     SPI1STATbits.SPIEN = 1; // enable                                         //
                                                                               //
-                                                                              //
-    //UART INITIALIZATION                                                     //             
-    U1BRG = 11; //set the baud rate register: (7372800 / 4) / (16 * 9600)-1   //
-    U1MODEbits.STSEL = 0; // 1 stop bit                                       //
-    U1MODEbits.PDSEL = 0b00; // 8 bit no parity                               //
-    U1MODEbits.UARTEN = 1; // uart enable                                     //
-                                                                              //
-    U1STAbits.UTXEN = 1; // unable transmission                               //
+                                                                              //                              //
                                                                               //
     //UART2 Initialization                                                    //
                                                                               //             
@@ -114,7 +97,6 @@ int main(void) {
     ////////////////////////////////////////////////////////////////////////////
     
     //////////Enable all the interrupts/////////////////////////////////////////
-    IEC0bits.U1RXIE = 1;   // enable interrupt for UART reception             //
     IEC1bits.U2RXIE = 1;   //enable interrupt for UART2 reception             //
     IEC0bits.INT0IE = 1;   //enable interrupt for button S5                   //
     IEC1bits.INT1IE = 1;   //enable interrupt for button S6                   //
@@ -126,25 +108,43 @@ int main(void) {
     //and not overwrite the string Char Recv
     spi_put_string("Char Recv:");
     //call the simulated algorithm
-
     
-    body();
+    while(1)
+    {
+        tmr_setup_period(TIMER1,10);
+        tmr_wait_ms(TIMER2,7);
+        
+        IEC1bits.U2RXIE = 0; //Disable interrupt UART2
+        
+        for(;R10<=W10; R10++)
+        {
+            spi_move_cursor(FIRST_ROW,cursor_count);
+                //if is received the two special character clear the first row
+            if((*R10=='\r') || (*R10=='\n') || (cursor_count==15)){
+                spi_clear_first_row();
+                cursor_count=0;
+            }
 
-    return 0;
-}
-
-int body()
-{
-    tmr_setup_period(TIMER1,10);
-    if(IFS0bits.T1IF == 1){ //If when enter the timer is already expires
-        IFS0bits.T1IF = 0; //Set the flag to zero and return error
-        return 1;
+            
+            else if(*R10!=NULL){
+                char character = (char)*R10;
+                spi_put_char(character);  //write the character on SPI
+                cursor_count++;
+                  
+            }
+        }
+        
+        //move the cursor in second row first column
+        spi_move_cursor(SECOND_ROW,11);
+        //write "Char Recv:"
+        sprintf(string,"%d",character_count);
+        //then the number of character received
+        spi_put_string(string);
+              
+        IEC1bits.U2RXIE = 1;
+               
+        tmr_wait_period(TIMER1);
     }
-    tmr_wait_ms(TIMER2,7);
-    
-    while(IFS0bits.T1IF == 0);
-    IFS0bits.T1IF = 0;
-    body();
 
     return 0;
 }
