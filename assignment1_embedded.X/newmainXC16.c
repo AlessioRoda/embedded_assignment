@@ -22,7 +22,7 @@ int character_count=0;
 //string global variable
 char string[16];
 
-/*
+
 //ISR for the UART
 void __attribute__((__interrupt__,__auto_psv__)) _U1RXInterrupt(){
     IFS0bits.U1RXIF = 0; //turn off the flag
@@ -78,6 +78,7 @@ void __attribute__((__interrupt__,__auto_psv__)) _INT1Interrupt(){
 
 //main function
 int main(void) {
+   
     //first need to wait 1 second
     //tmr_wait_ms(TIMER1, 1000);
     
@@ -112,20 +113,20 @@ int main(void) {
     U2STAbits.UTXEN = 1; // unable transmission                               //
     ////////////////////////////////////////////////////////////////////////////
     
-    //Enable all the interrupts
-    IEC0bits.U1RXIE = 1;   // enable interrupt for UART reception 
-    IEC1bits.U2RXIE = 1;   //enable interrupt for UART2 reception
-    IEC0bits.INT0IE = 1;   //enable interrupt for button S5
-    IEC1bits.INT1IE = 1;   //enable interrupt for button S6
-    
+    //////////Enable all the interrupts/////////////////////////////////////////
+    IEC0bits.U1RXIE = 1;   // enable interrupt for UART reception             //
+    IEC1bits.U2RXIE = 1;   //enable interrupt for UART2 reception             //
+    IEC0bits.INT0IE = 1;   //enable interrupt for button S5                   //
+    IEC1bits.INT1IE = 1;   //enable interrupt for button S6                   //
+    ////////////////////////////////////////////////////////////////////////////
+   
     //Put the cursor on the second row, column 0
     spi_move_cursor(SECOND_ROW,0);
     //in order to make the interrupt for UART2 faster
-    //and not override the string Char Recv
+    //and not overwrite the string Char Recv
     spi_put_string("Char Recv:");
     //call the simulated algorithm
- * */
-int main(void){
+
     
     body();
 

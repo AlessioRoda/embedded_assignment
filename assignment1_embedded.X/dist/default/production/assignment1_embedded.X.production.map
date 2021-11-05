@@ -129,9 +129,9 @@ section                    address   length (PC units)   length (bytes) (dec)
 .const                      0x12ac                 0xe            0x15  (21)
 .text                       0x12ba               0x2de           0x44d  (1101)
 .dinit                      0x1598                0xc2           0x123  (291)
-.text                       0x165a                0x90            0xd8  (216)
+.text                       0x165a                0x8a            0xcf  (207)
 
-                 Total "program" memory used (bytes):         0x20df  (8415) 17%
+                 Total "program" memory used (bytes):         0x20d6  (8406) 17%
 
 
 "data" Memory  [Origin = 0x800, Length = 0x800]
@@ -243,7 +243,7 @@ External Symbols in Program Memory (by address):
                   0x001548                  _spi_move_cursor
                   0x001576                  _spi_clear_first_row
                   0x00165a                  _main
-                  0x0016ba                  _body
+                  0x0016b4                  _body
 
 External Symbols in Program Memory (by name):
 
@@ -282,7 +282,7 @@ External Symbols in Program Memory (by name):
                   0x00013c                  __psv_init
                   0x000100                  __resetPRI
                   0x0003d2                  __sprintf_cdnopuxX
-                  0x0016ba                  _body
+                  0x0016b4                  _body
                   0x0012ba                  _choose_prescaler
                   0x00076e                  _efwrite
                   0x000de2                  _fclose
@@ -548,10 +548,10 @@ userdata
  .debug_abbrev    0x000000        0x14e build/default/production/assignment.o
  .debug_abbrev    0x00014e        0x17e build/default/production/newmainXC16.o
 
-.debug_line       0x000000        0x2d2
+.debug_line       0x000000        0x2d1
  *(.debug_line)
  .debug_line      0x000000        0x179 build/default/production/assignment.o
- .debug_line      0x000179        0x159 build/default/production/newmainXC16.o
+ .debug_line      0x000179        0x158 build/default/production/newmainXC16.o
 
 .debug_frame      0x000000        0x240
  *(.debug_frame)
@@ -1443,7 +1443,7 @@ __c30_signature
 .dinit            0x001598         0xc2
  .dinit           0x001598         0xc2 data_init
 
-.text             0x00165a         0x90
- .text            0x00165a         0x90 build/default/production/newmainXC16.o
+.text             0x00165a         0x8a
+ .text            0x00165a         0x8a build/default/production/newmainXC16.o
                   0x00165a                  _main
-                  0x0016ba                  _body
+                  0x0016b4                  _body
