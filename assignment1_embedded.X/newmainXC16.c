@@ -1,6 +1,8 @@
 /*
  * File:   main.c
- * Author: Alessio Roda, Enzo  Ubaldo Petrocco, Ermanno Girardo
+ * Author: Alessio Roda (S4458313), 
+ * Enzo  Ubaldo Petrocco (S4530363), 
+ * Ermanno Girardo (S4506472)
  *
  * Created on 27 ottobre 2021, 22.49
  */
@@ -24,7 +26,7 @@ int buff[30]; //Circular buffer
 int* W10 = (int*)&buff; //W10 points to the first element of buff
 int* R10 = (int*)&buff; //R10 points to the first element of buff, to read the buffer
 
-int buttonS6flag = 0;
+short int buttonS6flag = 0;
 
 
 //ISR for the UART2 
