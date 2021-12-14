@@ -33,6 +33,7 @@
 
 #define TIMER1 1
 #define TIMER2 2  
+#define TIMER3 3
 #define TIMER_BODY 10
 #define FIRST_ROW 0
 #define SECOND_ROW 1
@@ -55,5 +56,6 @@ void spi_put_string(char* str);
 void spi_move_cursor(int row, int column);
 //function used to clear the first row
 void spi_clear_first_row();
-
+//function to build the message to send to UART
+void build_message(double current,double temp,char* message);
 #endif	/*ASSIGNMENT_H */

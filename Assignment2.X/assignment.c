@@ -110,6 +110,24 @@ int tmr_wait_ms(int timer, int ms)
         T2CONbits.TON = 0;
         break;
     }
+     case TIMER3:
+    {
+        int pr,tckps;
+        choose_prescaler(ms, &pr, &tckps);
+        PR3=pr;
+        T3CONbits.TCKPS = tckps;
+        T3CONbits.TCS = 0;
+        T3CONbits.TGATE = 0;
+
+        T3CONbits.TON = 0;
+        IFS0bits.T3IF = 0;
+        TMR3 = 0;
+        T3CONbits.TON = 1;
+        while (IFS0bits.T3IF == 0);
+        IFS0bits.T3IF = 0;
+        T3CONbits.TON = 0;
+        break;
+    }
     }
     return 0;
 }
@@ -144,6 +162,18 @@ void tmr_setup_period(int timer,int ms)
         T2CONbits.TON=1; //start the timer
         break;
     }
+    case TIMER3:
+    {
+        int pr,tckps;
+        choose_prescaler(ms,&pr,&tckps);
+        PR3=pr;//set the count
+        T3CONbits.TCKPS=tckps; // set the prescaler
+        T3CONbits.TCS=0; //set the internal clock
+        T3CONbits.TGATE=0;
+        TMR3=0; //reset timer 3
+        T3CONbits.TON=1; //start the timer
+        break;
+    }
     }
 }
 
@@ -171,6 +201,16 @@ int tmr_wait_period(int timer)
         }
         while(IFS0bits.T2IF==0); //stay into the while until timer expires
         IFS0bits.T2IF=0;
+        break;
+    }
+    case TIMER3:
+    {
+        if(IFS0bits.T3IF==1){ //If when enter the timer is alreadu expires
+        IFS0bits.T3IF=0; //Set the flag to zero and return error
+        return 1;
+        }
+        while(IFS0bits.T3IF==0); //stay into the while until timer expires
+        IFS0bits.T3IF=0;
         break;
     }
     }
@@ -212,3 +252,4 @@ void spi_clear_first_row(){
         spi_put_char(' ');
     }
 }
+

@@ -1,1 +1,3 @@
-$MCREF,400*
+"$MCREF,1000*"
+
+wait 10 ms

@@ -8,13 +8,13 @@
 
 #include "xc.h"
 #include <stdio.h>
-#include <stdlib.h>
+#include "stdlib.h"
 #include "assignment.h"
 #include "parser.h"
 #include <string.h>
 
-
-
+///////////////////////GLOBAL VARIABLES/////////////////////
+char send_msg[25];
 #define CIRCULAR_BUFFER_SIZE 15
 
 typedef struct {
@@ -58,25 +58,40 @@ void __attribute__((__interrupt__,__auto_psv__)) _U2RXInterrupt(){
     while (U2STAbits.URXDA == 1) {
         write_cb(&circularBuffer, U2RXREG);
     }
-    
+}
+//ISR for the TIMER2
+void __attribute__((__interrupt__,__auto_psv__)) _T2Interrupt(){
+    IFS0bits.T2IF=0; //turn of the flag
+    LATBbits.LATB0= !LATBbits.LATB0; //toggle LED D3
 }
 
+//ISR for the TIMER3
+void __attribute__((__interrupt__,__auto_psv__)) _T3Interrupt(){
+    IFS0bits.T3IF=0; //turn of the flag
+    //write the message to UART////////////////////////////////
+    int length = strlen(send_msg);
+    int i;
+    for (i = 0;i<length;i++){
+        U2TXREG = send_msg[i];
+    }
+}
+//Analog to digital converter initialization
 void adc_configuration() {
-    ADCON3bits.ADCS = 16;
+    ADCON3bits.ADCS = 8;
     //ADCON1bits.ASAM = 0; // manual sampling start
     ADCON1bits.ASAM = 1; // automatic sampling start
     //ADCON1bits.SSRC = 0; // manual conversion start
     ADCON1bits.SSRC = 7; // automatic conversion start
-    ADCON3bits.SAMC = 31; // fixed conversion time (Only if SSRC = 7)
-    ADCON2bits.CHPS = 0; // CH0 only
-    //ADCON2bits.CHPS = 1; // CH0 & CH1
+    ADCON3bits.SAMC = 16; // fixed conversion time (Only if SSRC = 7)
+    //ADCON2bits.CHPS = 0; // CH0 only
+    ADCON2bits.CHPS = 1; // CH0 & CH1
     ADCHSbits.CH0SA = 2; // AN2 connected to CH0
     //ADCHSbits.CH0SA = 3; // AN3 connected to CH0
-    //ADCHSbits.CH123SA = 1; // AN3 connected to CH1
+    ADCHSbits.CH123SA = 1; // AN3 connected to CH1
     ADPCFG = 0xFFFF;
     ADPCFGbits.PCFG2 = 0; // AN2 as analog
-    //ADPCFGbits.PCFG3 = 0; // AN3 as analog
-    //ADCON2bits.SMPI = 1; // 2 sample/convert sequences
+    ADPCFGbits.PCFG3 = 0; // AN3 as analog
+    ADCON2bits.SMPI = 1; // 2 sample/convert sequences
     //ADCON1bits.SIMSAM = 1;
     //ADCON2bits.CSCNA = 1; // scan mode;
     
@@ -85,6 +100,26 @@ void adc_configuration() {
     ADCSSLbits.CSSL3 = 1; // scan AN3 */
     ADCON1bits.ADON = 1;    
 }
+
+//Build the message to send to UART
+//Format : $MCFBK,CURRENT,TEMP*
+void  build_message (double current,double temperature,char* message){
+         char type_message[7] = "$MCFBK,";
+         //Convert current & temperature in char
+         char current_char[6];
+         sprintf(current_char,"%f",current);
+         char temperature_char[5];
+         sprintf(temperature_char,"%f",temperature);
+         //Build the message
+         sprintf(message,"%s",current_char);
+         strcat(message,",");
+         strcat(message,temperature_char);
+         strcat(message,"*");
+         message = type_message;
+         printf(type_message);
+         printf("Il messaggio e : %s ",message);
+}
+
 
 
 int main(void) {
@@ -96,7 +131,11 @@ int main(void) {
     float duty_cycle;
     int velocity;
     
-    //UART2 Initialization                                                    //
+    ////////DECLARE THE LED D3 as OUTPUT////////////////////////////////////////
+    TRISBbits.TRISB0 = 0;
+    ////////DECLARE THE LED D4 as OUTPUT////////////////////////////////////////
+    TRISBbits.TRISB1 = 0;
+    //UART2 Initialization /////////////////////////////////////////////////////
                                                                               //             
     U2BRG = 11; //set the baud rate register: (7372800 / 4) / (16 * 9600)-1   //
     U2MODEbits.STSEL = 0; // 1 stop bit                                       //
@@ -104,33 +143,41 @@ int main(void) {
     U2MODEbits.UARTEN = 1; // UART enable                                     //
                                                                               //
     U2STAbits.UTXEN = 1; // unable transmission                               //
-    
-    // parser initialization
-    parser_state pstate;
-    pstate.state = STATE_DOLLAR;
-    pstate.index_type = 0;
-    pstate.index_payload = 0;
     ////////////////////////////////////////////////////////////////////////////
     
-     //////////Enable all the interrupts/////////////////////////////////////////
+    // parser initialization////////////////////////////////////////////////////
+    parser_state pstate;                                                      //
+    pstate.state = STATE_DOLLAR;                                              //
+    pstate.index_type = 0;                                                    //
+    pstate.index_payload = 0;                                                 //
+    ////////////////////////////////////////////////////////////////////////////
+    
+     //////////Enable all the interrupts////////////////////////////////////////
     IEC1bits.U2RXIE = 1;   //enable interrupt for UART2 reception             //
-    
+    IEC0bits.T2IE = 1;     //enable interrupt for TIMER2                      //
+    IEC0bits.T3IE = 1;     //enable interrupt fot TIMER3                      //
     ////////////////////////////////////////////////////////////////////////////
-    //Initialize PWM
+    
+    //Initialize PWM////////////////////////////////////////////////////////////
     //PTPER = 1842; // 1 kHz
     PTCONbits.PTMOD = 0; // free running
-    //PTCONbits.PTCKPS = 0; // 1:1 prescaler
-    PTCONbits.PTCKPS = 1; // 1:4 prescaler
+    PTCONbits.PTCKPS = 0; // 1:1 prescaler
+    //PTCONbits.PTCKPS = 1; // 1:4 prescaler
     PWMCON1bits.PEN2H = 1;
-    PWMCON1bits.PEN2L = 1;
-    PTPER = 9216; // 50 Hz
+    //PWMCON1bits.PEN2L = 1;
+    PTPER = 920; // 2 KHz
     PTCONbits.PTEN = 1; // enable pwm
+    ////////////////////////////////////////////////////////////////////////////
     
-    //adc config
+    ///////////adc config///////////////////////////////////////////////////////
     adc_configuration();
     //loop at 200 Hz - 5 ms
     tmr_setup_period(TIMER1,5);
     
+    /////////setup TIMER2 manually to 1000ms to blink D3////////////////////////
+    tmr_setup_period(TIMER2,1000);
+    /////////setup TIMER3 manually to 1000ms to send values to UART ////////////
+    tmr_setup_period(TIMER3,1000);
     while(1)
     {
         
@@ -191,27 +238,101 @@ int main(void) {
         
         
         //In this section we simulate analog current sensor ////////////////////
-        //wait until conversion done
-        while(!ADCON1bits.DONE);
-        //Variable to store the actual value of the potentiometer
-        int adcValue = ADCBUF0;
-        //scaling the potentiometer voltage
-        double voltage_potentiometer = 5 * (adcValue / 1023.0);
-        //compute the current
-        double current = 10 * (voltage_potentiometer - 3);
-        
-        
-        
+        //wait until conversion done                                          //
+        while(!ADCON1bits.DONE);                                              //
+        //Variable to store the actual value of the potentiometer             //
+        int adcValue = ADCBUF0;                                               //
+        //scaling the potentiometer voltage                                   //
+        double voltage_potentiometer = 5 * (adcValue / 1024.0);               //
+        //compute the current                                                 //
+        double current = 10 * (voltage_potentiometer - 3);                    //
+        char sign_current[1];
+        short int sign_curr;
+        if (current > 15){                                                    //
+            //turn on LED D4                                                  //
+            LATBbits.LATB1 = 1;                                               //   
+        }                                                                     //
+        else{                                                                 //
+            //turn off LED D4                                                 //
+            LATBbits.LATB1 = 0;                                               //
+        }                                                                     //
         ////////////////////////////////////////////////////////////////////////
-         
-        
-          
-        
        
-        
-//        
-        
-        
+        //////////// In this section read from AN3 for the temperature /////////
+         int adcValueTemp =ADCBUF1 ; // take the value from  ADC1 buffer 
+         double voltageTemp = adcValueTemp / 1024.0 * 5.0;
+         double temperature = (voltageTemp - 0.75) * 100.0  + 25; //[Celsius]
+         //test
+         current = -12.34;
+         temperature = -56.78;
+         char sign_temperature[1];
+         short int sign_temp;
+                 
+       /////////////////////////////////////////////////////////////////////////
+       
+     //In this section we send to UART the values for the current & temperature/
+         
+         //disable interrupt T3
+         IEC0bits.T3IE = 0;   
+         char message[25] = "$MCFBK,";
+         
+         //build_message(current,temperature,message);  
+         ///////////////BUILD THE MESSAGE///////////////////////////////////////
+         //Message Format : $MCFBK,CURRENT,TEMP*
+         //Temperature Format: sign + xxxxxx [mC°]
+         //Current Format: sign  + xxxxx [mA]
+         
+         //Check the sign for current and temperature
+         if (current < 0){
+             sign_curr = 1;
+             current = current * (-1);
+         }
+         else{
+             sign_curr = 0;
+         }
+         
+         if (temperature < 0){
+             temperature = temperature * (-1);
+             sign_temp = 1;
+         }
+         else{
+             sign_temp = 0;
+         }
+          
+         //Convert current & temperature in char
+         char current_char[5];
+         char temperature_char[6];
+         //Convert to integer to decrease the time needed to execute sprint
+         //In this way we convert the temperature and current in [mC°] [mA] 
+         int current_int = (int)(current * 100);
+         int temperature_int = (int)(temperature * 100);
+         sprintf(current_char,"%i",current_int);
+         sprintf(temperature_char,"%i",temperature_int);
+         if (sign_curr){
+         strcat(message,"-");
+         }
+         else{
+             strcat(message,"+");
+         }
+         strcat(message,current_char);
+         strcat(message,"0,");
+         if(sign_temp){
+             strcat(message,"-");
+         }
+         else{
+             strcat(message,"+");
+         }
+         strcat(message,temperature_char);
+         strcat(message,"0*");
+         //Copy the message into the global variable
+         strcpy(send_msg,message);
+         //enable T3 interrupt
+         IEC0bits.T3IE = 1;    
+         ///////////////////////////////////////////////////////////////////////
+         
+         ////////NOW SEND THE MESSAGE TO UART IN T3 INTERRUPT///////////////////
+         
+         
         tmr_wait_period(TIMER1);
     }
     
