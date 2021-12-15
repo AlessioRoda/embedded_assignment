@@ -6,6 +6,41 @@
  */
 
 
+// DSPIC30F4011 Configuration Bit Settings
+
+// 'C' source line config statements
+
+// FOSC
+#pragma config FPR = XT                 // Primary Oscillator Mode (XT)
+#pragma config FOS = FRC                // Oscillator Source (Internal Fast RC)
+#pragma config FCKSMEN = CSW_FSCM_OFF   // Clock Switching and Monitor (Sw Disabled, Mon Disabled)
+
+// FWDT
+#pragma config FWPSB = WDTPSB_16        // WDT Prescaler B (1:16)
+#pragma config FWPSA = WDTPSA_512       // WDT Prescaler A (1:512)
+#pragma config WDT = WDT_OFF            // Watchdog Timer (Disabled)
+
+// FBORPOR
+#pragma config FPWRT = PWRT_64          // POR Timer Value (64ms)
+#pragma config BODENV = BORV20          // Brown Out Voltage (Reserved)
+#pragma config BOREN = PBOR_ON          // PBOR Enable (Enabled)
+#pragma config LPOL = PWMxL_ACT_HI      // Low-side PWM Output Polarity (Active High)
+#pragma config HPOL = PWMxH_ACT_HI      // High-side PWM Output Polarity (Active High)
+#pragma config PWMPIN = RST_IOPIN       // PWM Output Pin Reset (Control with PORT/TRIS regs)
+#pragma config MCLRE = MCLR_EN          // Master Clear Enable (Enabled)
+
+// FGS
+#pragma config GWRP = GWRP_OFF          // General Code Segment Write Protect (Disabled)
+#pragma config GCP = CODE_PROT_OFF      // General Segment Code Protection (Disabled)
+
+// FICD
+#pragma config ICS = ICS_PGD            // Comm Channel Select (Use PGC/EMUC and PGD/EMUD)
+
+// #pragma config statements should precede project file includes.
+// Use project enums instead of #define for ON and OFF.
+
+#include <xc.h>
+
 #include "xc.h"
 #include <stdio.h>
 #include "stdlib.h"
@@ -15,6 +50,7 @@
 
 ///////////////////////GLOBAL VARIABLES/////////////////////
 char send_msg[25];
+int T3_fired = 0;
 #define CIRCULAR_BUFFER_SIZE 15
 
 typedef struct {
@@ -68,12 +104,9 @@ void __attribute__((__interrupt__,__auto_psv__)) _T2Interrupt(){
 //ISR for the TIMER3
 void __attribute__((__interrupt__,__auto_psv__)) _T3Interrupt(){
     IFS0bits.T3IF=0; //turn of the flag
-    //write the message to UART////////////////////////////////
-    int length = strlen(send_msg);
-    int i;
-    for (i = 0;i<length;i++){
-        U2TXREG = send_msg[i];
-    }
+    //set the flag to one
+    T3_fired = 1;
+    
 }
 //Analog to digital converter initialization
 void adc_configuration() {
@@ -101,25 +134,6 @@ void adc_configuration() {
     ADCON1bits.ADON = 1;    
 }
 
-//Build the message to send to UART
-//Format : $MCFBK,CURRENT,TEMP*
-void  build_message (double current,double temperature,char* message){
-         char type_message[7] = "$MCFBK,";
-         //Convert current & temperature in char
-         char current_char[6];
-         sprintf(current_char,"%f",current);
-         char temperature_char[5];
-         sprintf(temperature_char,"%f",temperature);
-         //Build the message
-         sprintf(message,"%s",current_char);
-         strcat(message,",");
-         strcat(message,temperature_char);
-         strcat(message,"*");
-         message = type_message;
-         printf(type_message);
-         printf("Il messaggio e : %s ",message);
-}
-
 
 
 int main(void) {
@@ -127,10 +141,12 @@ int main(void) {
     //first need to wait 1 second
     tmr_wait_ms(TIMER1, 1000);
     
-    
+    /////////////////////DECLARING VARIABLES////////////////////////////////////
     float duty_cycle;
     int velocity;
-    
+    int avl;
+    int count;
+    int ret;
     ////////DECLARE THE LED D3 as OUTPUT////////////////////////////////////////
     TRISBbits.TRISB0 = 0;
     ////////DECLARE THE LED D4 as OUTPUT////////////////////////////////////////
@@ -143,6 +159,14 @@ int main(void) {
     U2MODEbits.UARTEN = 1; // UART enable                                     //
                                                                               //
     U2STAbits.UTXEN = 1; // unable transmission                               //
+    
+    //SPI initialization                                                      //
+    SPI1CONbits.PPRE = 0b11;  // setup the primary prescaler to 1:1           //
+    SPI1CONbits.SPRE = 0b110; // setup the secundary prescaler to 2:1         //
+    //The two instructions above are needed becuase SPI works up to 1MHz      //
+    SPI1CONbits.MSTEN = 1; //master                                           //
+    SPI1CONbits.MODE16 = 0; // 8 bits                                         //
+    SPI1STATbits.SPIEN = 1; // enable                                         //
     ////////////////////////////////////////////////////////////////////////////
     
     // parser initialization////////////////////////////////////////////////////
@@ -165,6 +189,12 @@ int main(void) {
     //PTCONbits.PTCKPS = 1; // 1:4 prescaler
     PWMCON1bits.PEN2H = 1;
     //PWMCON1bits.PEN2L = 1;
+    //NOTE THAT:
+    //PTPER should be 920.6
+    //1843,2 / 2 - 1 = 920.6
+    //This introduce a computational error
+    //Then when duty cycle is 100% the square wave is not exactly constant
+    //In this way duty cycle ~= 99.9%
     PTPER = 920; // 2 KHz
     PTCONbits.PTEN = 1; // enable pwm
     ////////////////////////////////////////////////////////////////////////////
@@ -185,11 +215,11 @@ int main(void) {
         //Disable the UART interrupt
         IEC1bits.U2RXIE = 0;
         //compute the available space in cb
-        int avl = avl_bytes_cb(&circularBuffer);
+        avl = avl_bytes_cb(&circularBuffer);
         //enable UART interrupt
         IEC1bits.U2RXIE = 1;
         //initialize a counter to compare the free space in cb
-        int count = 0;
+        count = 0;
         //while loop until we have available space in cb
         while(count<avl){
             //variable to store the current byte in cb
@@ -200,7 +230,7 @@ int main(void) {
             read_cb(&circularBuffer, &byte);
             //enable UART interrupt
             IEC1bits.U2RXIE = 1;
-            int ret = parse_byte(&pstate, byte);
+            ret = parse_byte(&pstate, byte);
             //if a new message is acquired
             if (ret == NEW_MESSAGE){
                 // if the type of messagge is consistent
@@ -228,6 +258,9 @@ int main(void) {
         //Compute duty cycle
         //Set the correct voltage vlaue on the basis of the RPM
         duty_cycle = 0.001 * (velocity);
+        int duty_int = (int)(duty_cycle * 100);
+        char duty_char[3];
+        sprintf(duty_char,"%i",duty_int);
         //apply the PWM
         PDC2 = duty_cycle * 2 * PTPER;
         
@@ -263,8 +296,8 @@ int main(void) {
          double voltageTemp = adcValueTemp / 1024.0 * 5.0;
          double temperature = (voltageTemp - 0.75) * 100.0  + 25; //[Celsius]
          //test
-         current = -12.34;
-         temperature = -56.78;
+        // current = -12.34;
+         //temperature = -56.78;
          char sign_temperature[1];
          short int sign_temp;
                  
@@ -303,7 +336,7 @@ int main(void) {
          char current_char[5];
          char temperature_char[6];
          //Convert to integer to decrease the time needed to execute sprint
-         //In this way we convert the temperature and current in [mC°] [mA] 
+         //In this way we convert the temperature and current in [cC°] [cA] 
          int current_int = (int)(current * 100);
          int temperature_int = (int)(temperature * 100);
          sprintf(current_char,"%i",current_int);
@@ -315,7 +348,7 @@ int main(void) {
              strcat(message,"+");
          }
          strcat(message,current_char);
-         strcat(message,"0,");
+         strcat(message,",");
          if(sign_temp){
              strcat(message,"-");
          }
@@ -323,7 +356,7 @@ int main(void) {
              strcat(message,"+");
          }
          strcat(message,temperature_char);
-         strcat(message,"0*");
+         strcat(message,"*");
          //Copy the message into the global variable
          strcpy(send_msg,message);
          //enable T3 interrupt
@@ -331,6 +364,21 @@ int main(void) {
          ///////////////////////////////////////////////////////////////////////
          
          ////////NOW SEND THE MESSAGE TO UART IN T3 INTERRUPT///////////////////
+         if(T3_fired){
+            int length = strlen(send_msg);
+            int i;
+            for (i = 0;i<length;i++){
+                while(U2STAbits.UTXBF);
+                U2TXREG = send_msg[i];
+            }
+            //write on SPI
+            spi_clear_first_row();
+            spi_move_cursor(FIRST_ROW,0);
+            spi_put_string(duty_char);
+            //reset the interrupt flag to 0
+            T3_fired = 0;
+         }
+         
          
          
         tmr_wait_period(TIMER1);
