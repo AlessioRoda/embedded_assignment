@@ -56,6 +56,8 @@ c:/program files/microchip/xc16/v1.70/bin/bin/../../lib\liblega-pic30-elf.a(crt_
                               (__crt_start_mode_normal)
 c:/program files/microchip/xc16/v1.70/bin/bin/../../lib\liblega-c-elf.a(strcmp.XX_eo)
                               build/default/production/newmainXC16.o (_strcmp)
+c:/program files/microchip/xc16/v1.70/bin/bin/../../lib\liblega-c-elf.a(strlen.XX_eo)
+                              build/default/production/newmainXC16.o (_strlen)
 
 
 xc16-ld 1.70 (B)
@@ -68,12 +70,12 @@ Default Scalar Model: Small
 
 section                    address   length (PC units)   length (bytes) (dec)
 -------                    -------   -----------------   --------------------
-.text                        0x100               0x126           0x1b9  (441)
-.const                       0x226                 0x6             0x9  (9)
-.text                        0x22c               0x6ca           0xa2f  (2607)
-.dinit                       0x8f6                 0x8             0xc  (12)
+.text                        0x100               0x132           0x1cb  (459)
+.const                       0x232                 0x6             0x9  (9)
+.text                        0x238               0x7d0           0xbb8  (3000)
+.dinit                       0xa08                 0x8             0xc  (12)
 
-                 Total "program" memory used (bytes):          0xbfd  (3069) 6%
+                 Total "program" memory used (bytes):          0xd98  (3480) 7%
 
 
 "data" Memory  [Origin = 0x800, Length = 0x800]
@@ -116,21 +118,23 @@ External Symbols in Program Memory (by address):
                   0x0001c8                  __U2RXInterrupt
                   0x000200                  __DefaultInterrupt
                   0x000206                  _strcmp
-                  0x00022c                  _choose_prescaler
-                  0x00031c                  _tmr_wait_ms
-                  0x0003fe                  _tmr_setup_period
-                  0x0004a4                  _tmr_wait_period
-                  0x000518                  _spi_put_char
-                  0x00052e                  _spi_put_string
-                  0x000554                  _spi_move_cursor
-                  0x000582                  _spi_clear_first_row
-                  0x0005a4                  _write_cb
-                  0x0005e4                  _read_cb
-                  0x00061c                  _avl_bytes_cb
-                  0x000648                  _scheduler
-                  0x00069e                  _main
-                  0x00074e                  _parse_byte
-                  0x000848                  _extract_integer
+                  0x000226                  _strlen
+                  0x000238                  _choose_prescaler
+                  0x000328                  _tmr_wait_ms
+                  0x00040a                  _tmr_setup_period
+                  0x0004b0                  _tmr_wait_period
+                  0x000524                  _spi_put_char
+                  0x00053a                  _spi_put_string
+                  0x000560                  _spi_move_cursor
+                  0x00058e                  _spi_clear_first_row
+                  0x0005b0                  _write_cb
+                  0x0005f0                  _read_cb
+                  0x000628                  _avl_bytes_cb
+                  0x000654                  _scheduler
+                  0x0006aa                  _extract_message
+                  0x00078a                  _main
+                  0x000860                  _parse_byte
+                  0x00095a                  _extract_integer
 
 External Symbols in Program Memory (by name):
 
@@ -140,22 +144,24 @@ External Symbols in Program Memory (by name):
                   0x000152                  __data_init_standard
                   0x00013c                  __psv_init
                   0x000100                  __resetPRI
-                  0x00061c                  _avl_bytes_cb
-                  0x00022c                  _choose_prescaler
-                  0x000848                  _extract_integer
-                  0x00069e                  _main
-                  0x00074e                  _parse_byte
-                  0x0005e4                  _read_cb
-                  0x000648                  _scheduler
-                  0x000582                  _spi_clear_first_row
-                  0x000554                  _spi_move_cursor
-                  0x000518                  _spi_put_char
-                  0x00052e                  _spi_put_string
+                  0x000628                  _avl_bytes_cb
+                  0x000238                  _choose_prescaler
+                  0x00095a                  _extract_integer
+                  0x0006aa                  _extract_message
+                  0x00078a                  _main
+                  0x000860                  _parse_byte
+                  0x0005f0                  _read_cb
+                  0x000654                  _scheduler
+                  0x00058e                  _spi_clear_first_row
+                  0x000560                  _spi_move_cursor
+                  0x000524                  _spi_put_char
+                  0x00053a                  _spi_put_string
                   0x000206                  _strcmp
-                  0x0003fe                  _tmr_setup_period
-                  0x00031c                  _tmr_wait_ms
-                  0x0004a4                  _tmr_wait_period
-                  0x0005a4                  _write_cb
+                  0x000226                  _strlen
+                  0x00040a                  _tmr_setup_period
+                  0x000328                  _tmr_wait_ms
+                  0x0004b0                  _tmr_wait_period
+                  0x0005b0                  _write_cb
 
 Memory Configuration
 
@@ -214,7 +220,7 @@ LOAD c:/program files/microchip/xc16/v1.70/bin/bin/../../lib\libfx-elf.a
                   0x000002          0x2 SHORT 0x0 ((ABSOLUTE (__reset) >> 0x10) & 0x7f)
                   0x000003          0x2 SHORT 0x0
 
-.text             0x000100        0x126
+.text             0x000100        0x132
  *(.init)
  .init            0x000100         0x4c c:/program files/microchip/xc16/v1.70/bin/bin/../../lib\liblega-pic30-elf.a(crt0_standard.o)
                   0x000100                  __resetPRI
@@ -240,6 +246,8 @@ LOAD c:/program files/microchip/xc16/v1.70/bin/bin/../../lib\libfx-elf.a
                   0x000204                  __crt_start_mode_normal
  .libc.strcmp     0x000206         0x20 c:/program files/microchip/xc16/v1.70/bin/bin/../../lib\liblega-c-elf.a(strcmp.XX_eo)
                   0x000206                  _strcmp
+ .libc.strlen     0x000226          0xc c:/program files/microchip/xc16/v1.70/bin/bin/../../lib\liblega-c-elf.a(strlen.XX_eo)
+                  0x000226                  _strlen
 
 usercode
  *(usercode)
@@ -286,35 +294,35 @@ userdata
 .comment
  *(.comment)
 
-.debug_info       0x000000       0x1b4e
+.debug_info       0x000000       0x1cb4
  *(.debug_info)
- .debug_info      0x000000        0xeab build/default/production/newmainXC16.o
- .debug_info      0x000eab        0xa8d build/default/production/assignment.o
- .debug_info      0x001938        0x216 build/default/production/parser.o
+ .debug_info      0x000000        0xfe9 build/default/production/newmainXC16.o
+ .debug_info      0x000fe9        0xaa1 build/default/production/assignment.o
+ .debug_info      0x001a8a        0x22a build/default/production/parser.o
  *(.gnu.linkonce.wi.*)
 
-.debug_abbrev     0x000000        0x3af
+.debug_abbrev     0x000000        0x3d9
  *(.debug_abbrev)
- .debug_abbrev    0x000000        0x1ab build/default/production/newmainXC16.o
- .debug_abbrev    0x0001ab        0x163 build/default/production/assignment.o
- .debug_abbrev    0x00030e         0xa1 build/default/production/parser.o
+ .debug_abbrev    0x000000        0x1d5 build/default/production/newmainXC16.o
+ .debug_abbrev    0x0001d5        0x163 build/default/production/assignment.o
+ .debug_abbrev    0x000338         0xa1 build/default/production/parser.o
 
-.debug_line       0x000000        0x38b
+.debug_line       0x000000        0x3b4
  *(.debug_line)
- .debug_line      0x000000        0x174 build/default/production/newmainXC16.o
- .debug_line      0x000174        0x196 build/default/production/assignment.o
- .debug_line      0x00030a         0x81 build/default/production/parser.o
+ .debug_line      0x000000        0x19d build/default/production/newmainXC16.o
+ .debug_line      0x00019d        0x196 build/default/production/assignment.o
+ .debug_line      0x000333         0x81 build/default/production/parser.o
 
-.debug_frame      0x000000        0x212
+.debug_frame      0x000000        0x234
  *(.debug_frame)
- .debug_frame     0x000000         0xdc build/default/production/newmainXC16.o
- .debug_frame     0x0000dc         0xee build/default/production/assignment.o
- .debug_frame     0x0001ca         0x48 build/default/production/parser.o
+ .debug_frame     0x000000         0xfe build/default/production/newmainXC16.o
+ .debug_frame     0x0000fe         0xee build/default/production/assignment.o
+ .debug_frame     0x0001ec         0x48 build/default/production/parser.o
 
-.debug_str        0x000000         0xa7
+.debug_str        0x000000         0xc6
  *(.debug_str)
- .debug_str       0x000000         0x5f build/default/production/newmainXC16.o
- .debug_str       0x00005f         0x48 build/default/production/assignment.o
+ .debug_str       0x000000         0x7e build/default/production/newmainXC16.o
+ .debug_str       0x00007e         0x48 build/default/production/assignment.o
 
 .debug_loc
  *(.debug_loc)
@@ -323,14 +331,14 @@ userdata
  *(.debug_macinfo)
 
 .debug_pubnames
-                  0x000000        0x16c
+                  0x000000        0x180
  *(.debug_pubnames)
  .debug_pubnames
-                  0x000000         0x87 build/default/production/newmainXC16.o
+                  0x000000         0x9b build/default/production/newmainXC16.o
  .debug_pubnames
-                  0x000087         0xb0 build/default/production/assignment.o
+                  0x00009b         0xb0 build/default/production/assignment.o
  .debug_pubnames
-                  0x000137         0x35 build/default/production/parser.o
+                  0x00014b         0x35 build/default/production/parser.o
 
 .debug_ranges
  *(.debug_ranges)
@@ -1064,7 +1072,7 @@ LOAD data_init
                   0x000233         0x23 build/default/production/parser.o
 
 __c30_signature
-                  0x000256         0x24
+                  0x000256         0x2a
  __c30_signature
                   0x000256          0x6 build/default/production/newmainXC16.o
  __c30_signature
@@ -1077,6 +1085,8 @@ __c30_signature
                   0x00026e          0x6 c:/program files/microchip/xc16/v1.70/bin/bin/../../lib\liblega-pic30-elf.a(data_init_standard.o)
  __c30_signature
                   0x000274          0x6 c:/program files/microchip/xc16/v1.70/bin/bin/../../lib\liblega-c-elf.a(strcmp.XX_eo)
+ __c30_signature
+                  0x00027a          0x6 c:/program files/microchip/xc16/v1.70/bin/bin/../../lib\liblega-c-elf.a(strlen.XX_eo)
 
 .nbss               0x0800         0x24
  .nbss              0x0800         0x24 build/default/production/newmainXC16.o
@@ -1088,28 +1098,29 @@ __c30_signature
  .ivt._U2RXInterrupt
                   0x000044          0x2 build/default/production/newmainXC16.o
 
-.const              0x8226          0x6 load address 0x000226  
- .const             0x8226          0x6 build/default/production/newmainXC16.o
+.const              0x8232          0x6 load address 0x000232  
+ .const             0x8232          0x6 build/default/production/newmainXC16.o
 
-.text             0x00022c        0x6ca
- .text            0x00022c        0x378 build/default/production/assignment.o
-                  0x00022c                  _choose_prescaler
-                  0x00031c                  _tmr_wait_ms
-                  0x0003fe                  _tmr_setup_period
-                  0x0004a4                  _tmr_wait_period
-                  0x000518                  _spi_put_char
-                  0x00052e                  _spi_put_string
-                  0x000554                  _spi_move_cursor
-                  0x000582                  _spi_clear_first_row
- .text            0x0005a4        0x1aa build/default/production/newmainXC16.o
-                  0x0005a4                  _write_cb
-                  0x0005e4                  _read_cb
-                  0x00061c                  _avl_bytes_cb
-                  0x000648                  _scheduler
-                  0x00069e                  _main
- .text            0x00074e        0x1a8 build/default/production/parser.o
-                  0x00074e                  _parse_byte
-                  0x000848                  _extract_integer
+.text             0x000238        0x7d0
+ .text            0x000238        0x378 build/default/production/assignment.o
+                  0x000238                  _choose_prescaler
+                  0x000328                  _tmr_wait_ms
+                  0x00040a                  _tmr_setup_period
+                  0x0004b0                  _tmr_wait_period
+                  0x000524                  _spi_put_char
+                  0x00053a                  _spi_put_string
+                  0x000560                  _spi_move_cursor
+                  0x00058e                  _spi_clear_first_row
+ .text            0x0005b0        0x2b0 build/default/production/newmainXC16.o
+                  0x0005b0                  _write_cb
+                  0x0005f0                  _read_cb
+                  0x000628                  _avl_bytes_cb
+                  0x000654                  _scheduler
+                  0x0006aa                  _extract_message
+                  0x00078a                  _main
+ .text            0x000860        0x1a8 build/default/production/parser.o
+                  0x000860                  _parse_byte
+                  0x00095a                  _extract_integer
 
-.dinit            0x0008f6          0x8
- .dinit           0x0008f6          0x8 data_init
+.dinit            0x000a08          0x8
+ .dinit           0x000a08          0x8 data_init

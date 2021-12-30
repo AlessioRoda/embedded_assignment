@@ -95,28 +95,33 @@ heartbeat schedInfo[MAX_TASKS];
     int extract_message(const char* str, int* n1, int* n2)
     {
         int len= strlen(str);
-        char* string1;
-        char* string2;
+        char string1[len];
+        char string2[len];
         
-        int i=0;
+        
+        int i;
         int j=0;
         int flag =1;
-        for(;i<len; i++)
+        for(i=0;i<len+1; i++)
         {
             if(str[i]==',')
             {
-                flag= extract_integer(string1, n1);
+                
+               char* string_to_send= string1; 
+                flag= extract_integer(string_to_send, n1);
                 
                 if(flag==-1)
                 {
                     return -1;
                 }
+                i++;
                 j=i;
             }
             
             if(str[i]=='\0')
             {
-                flag= extract_integer(string2, n2);
+                char* string_to_send= string2;
+                flag= extract_integer(string_to_send, n2);
                 
                 if(flag==-1)
                 {
@@ -144,9 +149,10 @@ int main(void) {
     //first need to wait 1 second
     tmr_wait_ms(TIMER1, 1000);
     
-    float duty_cycle;
-    int velocity_r; 
-    int velocity_l;
+    float duty_cycle_l;
+    float duty_cycle_r;
+    int velocity_r=0; 
+    int velocity_l=0;
     int avl;
     int count;
     int ret;
@@ -188,6 +194,17 @@ int main(void) {
     pstate.state = STATE_DOLLAR;                                              //
     pstate.index_type = 0;                                                    //
     pstate.index_payload = 0;                                                 //
+    ////////////////////////////////////////////////////////////////////////////
+        //Initialize PWM////////////////////////////////////////////////////////////
+    PTPER = 1842; // 1 kHz
+    PTCONbits.PTMOD = 0; // free running
+    PTCONbits.PTCKPS = 0; // 1:1 prescaler
+    //PTCONbits.PTCKPS = 1; // 1:4 prescaler
+    PWMCON1bits.PEN2H = 1;
+    //PWMCON1bits.PEN2L = 1;
+    PWMCON1bits.PEN1H = 1;
+
+    PTCONbits.PTEN = 1; // enable pwm
     ////////////////////////////////////////////////////////////////////////////
     
     
@@ -246,6 +263,21 @@ int main(void) {
             }
             count++;
         }
+        
+        //Compute duty cycle
+        //Set the correct voltage vlaue on the basis of the RPM
+        duty_cycle_l = 1.0/24000 * velocity_l + 0.5;
+        duty_cycle_r = 1.0/24000 * velocity_r + 0.5;
+        int duty_int_l = (int)(duty_cycle_l * 100);
+        int duty_int_r = (int)(duty_cycle_r * 100);
+        char duty_char_l[3];
+        char duty_char_r[3];
+        sprintf(duty_char_l,"%i",duty_int_l);
+        sprintf(duty_char_r,"%i",duty_int_r);
+        //apply the PWM
+        PDC1 = duty_cycle_l * 2 * PTPER;
+        PDC2 = duty_cycle_r * 2 * PTPER;
+        int l=0;
     }
     
     
