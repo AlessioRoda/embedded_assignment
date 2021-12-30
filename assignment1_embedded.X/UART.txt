@@ -1,5 +1,0 @@
-05
-
-wait 10 ms
-
-"THIS IS A TWST"

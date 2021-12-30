@@ -1,5 +1,0 @@
-05
-
-wait 10 ms
-
-"This is the text file of the assignment"
