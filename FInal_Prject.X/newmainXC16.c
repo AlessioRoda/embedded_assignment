@@ -16,6 +16,10 @@
 
 #define MAX_TASKS 4  //DA CAMBIARE!!!
 #define CIRCULAR_BUFFER_SIZE 15
+#define TEMP_CIRCULAR_BUFFER_SIZE 10
+
+float standby=0; 
+char* temp_message_ptr; 
 
 typedef struct {
 int n;
@@ -29,9 +33,8 @@ typedef struct {
     int writeIndex;
 } circular_buffer_t;
 
+
 volatile circular_buffer_t circularBuffer;
-
-
 
 void write_cb(volatile circular_buffer_t* cb, char byte) {
     cb->buffer[cb->writeIndex] = byte;
@@ -66,6 +69,8 @@ void __attribute__((__interrupt__,__auto_psv__)) _U2RXInterrupt(){
     while (U2STAbits.URXDA == 1) {
         write_cb(&circularBuffer, U2RXREG);
     }
+    standby=0;
+    LATBbits.LATB1 =0; // Turn off the led
 }
 
 
@@ -91,6 +96,35 @@ heartbeat schedInfo[MAX_TASKS];
     }
     }
 }
+    
+    
+    //Analog to digital converter initialization
+void adc_configuration() {
+    ADCON3bits.ADCS = 8;
+    //ADCON1bits.ASAM = 0; // manual sampling start
+    ADCON1bits.ASAM = 1; // automatic sampling start
+    //ADCON1bits.SSRC = 0; // manual conversion start
+    ADCON1bits.SSRC = 7; // automatic conversion start
+    ADCON3bits.SAMC = 16; // fixed conversion time (Only if SSRC = 7)
+    //ADCON2bits.CHPS = 0; // CH0 only
+    ADCON2bits.CHPS = 1; // CH0 & CH1
+    ADCHSbits.CH0SA = 2; // AN2 connected to CH0
+    //ADCHSbits.CH0SA = 3; // AN3 connected to CH0
+    ADCHSbits.CH123SA = 1; // AN3 connected to CH1
+    ADPCFG = 0xFFFF;
+    ADPCFGbits.PCFG2 = 0; // AN2 as analog
+    ADPCFGbits.PCFG3 = 0; // AN3 as analog
+    ADCON2bits.SMPI = 1; // 2 sample/convert sequences
+    //ADCON1bits.SIMSAM = 1;
+    //ADCON2bits.CSCNA = 1; // scan mode;
+    
+    /*ADCSSL = 0;
+    ADCSSLbits.CSSL2 = 1; // scan AN2
+    ADCSSLbits.CSSL3 = 1; // scan AN3 */
+    ADCON1bits.ADON = 1;    
+}
+    
+    
 
     int extract_message(const char* str, int* n1, int* n2)
     {
@@ -156,8 +190,16 @@ int main(void) {
     int avl;
     int count;
     int ret;
+    int main_period=100;
+    int temp_count=0;
+    float temperature_array[10];
     
     
+    
+    ////////DECLARE THE LED D4 as OUTPUT////////////////////////////////////////
+    TRISBbits.TRISB1 = 0;
+    //Initialize LED D4 off                                                 //
+    LATBbits.LATB1 = 0; 
     //Initialize PWM////////////////////////////////////////////////////////////
     //PTPER = 1842; // 1 kHz
     PTCONbits.PTMOD = 0; // free running
@@ -201,8 +243,13 @@ int main(void) {
     PTCONbits.PTCKPS = 0; // 1:1 prescaler
     //PTCONbits.PTCKPS = 1; // 1:4 prescaler
     PWMCON1bits.PEN2H = 1;
-    //PWMCON1bits.PEN2L = 1;
+    PWMCON1bits.PEN2L = 1;
     PWMCON1bits.PEN1H = 1;
+    PWMCON1bits.PEN1L = 1;
+    
+    DTCON1bits.DTA=9; //This gives about 5 micro seconds
+    //Dead time prescaler 
+    DTCON1bits.DTAPS=0; //No approximation 
 
     PTCONbits.PTEN = 1; // enable pwm
     ////////////////////////////////////////////////////////////////////////////
@@ -210,10 +257,24 @@ int main(void) {
     
     
     while(1)
-    {
+    {   
         //In this section we read and convert from UART ////////////////////////
         //Disable the UART interrupt
         IEC1bits.U2RXIE = 0;
+        
+        standby+=main_period;
+        if(standby>=5000)
+        {
+            //Set velocity motors to zero
+            int velocity_r=0; 
+            int velocity_l=0;
+       
+            //Blink LED D4                                                  
+            LATBbits.LATB1 = !LATBbits.LATB1;
+        }
+       
+        
+        
         //compute the available space in cb
         avl = avl_bytes_cb(&circularBuffer);
         //enable UART interrupt
@@ -221,7 +282,7 @@ int main(void) {
         //initialize a counter to compare the free space in cb
         count = 0;
         //while loop until we have available space in cb
-        while(count<avl){
+        while(count<avl && standby<5000){
             //variable to store the current byte in cb
             char byte;
             //disable UART interrupt
@@ -264,6 +325,7 @@ int main(void) {
             count++;
         }
         
+        
         //Compute duty cycle
         //Set the correct voltage vlaue on the basis of the RPM
         duty_cycle_l = 1.0/24000 * velocity_l + 0.5;
@@ -278,6 +340,58 @@ int main(void) {
         PDC1 = duty_cycle_l * 2 * PTPER;
         PDC2 = duty_cycle_r * 2 * PTPER;
         int l=0;
+        
+        //////////// In this section read from AN3 for the temperature /////////
+         int adcValueTemp =ADCBUF1 ; // take the value from  ADC1 buffer 
+         double voltageTemp = adcValueTemp / 1024.0 * 5.0;
+         double temperature = (voltageTemp - 0.75) * 100.0  + 25; //[Celsius]
+         
+         temperature_array[temp_count]=temperature;
+         temp_count+=1;
+        float average=0;
+         if(temp_count==10)
+         {
+             int k=0;
+             float sum=0;
+             for(; k<10; k++)
+             {
+                 sum=temperature_array[k]+sum;
+             }
+             average=sum/10;
+             temp_count=0;
+             
+             
+             short int sign_temp=0;
+             
+            if (average < 0){
+                average = average * (-1);
+                sign_temp = 1;
+            }
+             
+            else{
+                sign_temp = 0;
+            }
+             
+             char temp_message[15] = "MCTEM,";
+             //Average of the tempearture in centi celsius in order to speed up 
+             //the sprintf function
+             int average_int = (int)(average * 100);
+             
+            if(sign_temp){
+             strcat(temp_message,"-");
+            }
+            else{
+                strcat(temp_message,"+");
+            }
+             
+             char current_char[5];
+            sprintf(current_char,"%i",average_int);
+            strcat(temp_message,current_char);
+
+            strcat(temp_message,"*");
+            temp_message_ptr=temp_message;
+         }
+
     }
     
     
