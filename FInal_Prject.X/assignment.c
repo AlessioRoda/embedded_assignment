@@ -252,3 +252,11 @@ void spi_clear_first_row(){
         spi_put_char(' ');
     }
 }
+
+void spi_clear_second_row(){
+    spi_move_cursor(SECOND_ROW, 0);
+    int i=0;
+    for(i=0;i<16;i++){
+        spi_put_char(' ');
+    }
+}
