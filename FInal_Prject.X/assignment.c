@@ -252,4 +252,3 @@ void spi_clear_first_row(){
         spi_put_char(' ');
     }
 }
-

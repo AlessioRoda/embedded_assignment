@@ -18,8 +18,10 @@
 #define CIRCULAR_BUFFER_SIZE 15
 #define TEMP_CIRCULAR_BUFFER_SIZE 10
 
+///////////////////////////GLOBAL VARIABLES/////////////////////////////////////
 float standby=0; 
 char* temp_message_ptr; 
+short int safe_mode = 0;
 
 typedef struct {
 int n;
@@ -70,7 +72,7 @@ void __attribute__((__interrupt__,__auto_psv__)) _U2RXInterrupt(){
         write_cb(&circularBuffer, U2RXREG);
     }
     standby=0;
-    LATBbits.LATB1 =0; // Turn off the led
+    LATBbits.LATB1 = 0; // Turn off the led
 }
 
 
@@ -177,6 +179,41 @@ void adc_configuration() {
         return 0;
     }
     
+    //ISR when the button S5 is pressed
+void __attribute__((__interrupt__,__auto_psv__)) _INT0Interrupt(){
+    IFS0bits.INT0IF = 0; //turn off the flag
+    safe_mode = 1;
+    //Stop immediately the motors
+    //Setting velocity to zero
+    //Is equal to have duty cycle 50%
+    PDC1 = 50 * 2 * PTPER;
+    PDC2 = 50 * 2 * PTPER;
+}
+
+//Function to send enable ack
+void send_ack(char* msg_type,int value){
+    //Build message
+    char message[15] = "$MCACK,";
+    char value_char;
+    sprintf(value_char,"%i",value);
+    int j = 0;
+    char type[3];
+    for(;j<3;j++){
+        type[j] = (msg_type +j);
+    }
+    strcat(message,type);
+    strcat(message,",");
+    strcat(message,value_char);
+    strcat(message,"*");
+    //Send to UART the message
+    int k = 0;
+    int str_len = strlen(message);
+    for (;k<str_len;k++){
+        while(U2STAbits.UTXBF);
+        U2TXREG = message[k];
+    }
+}
+
 
 int main(void) {
     
@@ -193,13 +230,18 @@ int main(void) {
     int main_period=100;
     int temp_count=0;
     float temperature_array[10];
-    
+    char ack_enable[3] = "ENA";
+    char ack_saturation[3] = "SAT";
+    char* ack_en_ptr = &ack_enable[0];
+    char* ack_sat_ptr = &ack_saturation[0];
     
     
     ////////DECLARE THE LED D4 as OUTPUT////////////////////////////////////////
     TRISBbits.TRISB1 = 0;
     //Initialize LED D4 off                                                 //
     LATBbits.LATB1 = 0; 
+    ////////////////DECLARE BUTTON S5 as INPUT//////////////////////////////////
+    TRISEbits.TRISE8 = 1; //button S5 as input                                //
     //Initialize PWM////////////////////////////////////////////////////////////
     //PTPER = 1842; // 1 kHz
     PTCONbits.PTMOD = 0; // free running
@@ -229,6 +271,7 @@ int main(void) {
     IEC1bits.U2RXIE = 1;   //enable interrupt for UART2 reception             //
     IEC0bits.T2IE = 1;     //enable interrupt for TIMER2                      //
     IEC0bits.T3IE = 1;     //enable interrupt fot TIMER3                      //
+    IEC0bits.INT0IE = 1;   //enable interrupt for button S5                   //
     ////////////////////////////////////////////////////////////////////////////
        
     // parser initialization////////////////////////////////////////////////////
@@ -237,7 +280,7 @@ int main(void) {
     pstate.index_type = 0;                                                    //
     pstate.index_payload = 0;                                                 //
     ////////////////////////////////////////////////////////////////////////////
-        //Initialize PWM////////////////////////////////////////////////////////////
+        //Initialize PWM////////////////////////////////////////////////////////
     PTPER = 1842; // 1 kHz
     PTCONbits.PTMOD = 0; // free running
     PTCONbits.PTCKPS = 0; // 1:1 prescaler
@@ -295,7 +338,7 @@ int main(void) {
             //if a new message is acquired
             if (ret == NEW_MESSAGE){
                 // if the type of messagge is consistent
-                if(strcmp(pstate.msg_type, "HLREF") == 0){
+                if(strcmp(pstate.msg_type, "HLREF") == 0 && safe_mode == 0){
                     //then extract integer into the velocity
                     //ret = extract_integer(pstate.msg_payload, &velocity);
                     ret = extract_message(pstate.msg_payload, &velocity_l, &velocity_r);
@@ -321,11 +364,25 @@ int main(void) {
                         }
                     }
                 }
+                if(strcmp(pstate.msg_type, "HLENA") == 0){
+                    //disable S5 interrupt
+                    IEC0bits.INT0IE = 0;
+                    safe_mode = 0;
+                    send_ack(ack_en_ptr,1);
+                }
             }
             count++;
         }
         
-        
+         ////////////IMPLEMENTING THE SAFE MODE///////////
+         //ENTER IF S5 BUTTON IS PRESSED
+         //1)MOTORS ARE STOPPED UNTIL ENABLE MESSAGE IS RECEIVED
+         //2)AFTER EXIT MOTORS VELOCITY SHOULD BE SET TO 0
+         //3)SEND ACK TO PC ONCE ENABLE COMMAND IS RECEIVED
+         if (safe_mode == 1){
+             velocity_l = 0;
+             velocity_r = 0;
+         }
         //Compute duty cycle
         //Set the correct voltage vlaue on the basis of the RPM
         duty_cycle_l = 1.0/24000 * velocity_l + 0.5;
@@ -348,7 +405,7 @@ int main(void) {
          
          temperature_array[temp_count]=temperature;
          temp_count+=1;
-        float average=0;
+         float average=0;
          if(temp_count==10)
          {
              int k=0;
@@ -361,7 +418,7 @@ int main(void) {
              temp_count=0;
              
              
-             short int sign_temp=0;
+            short int sign_temp=0;
              
             if (average < 0){
                 average = average * (-1);
@@ -392,6 +449,19 @@ int main(void) {
             temp_message_ptr=temp_message;
          }
 
+         ////// BUILD THE MESSAGE TO SEND TO THE PC//////
+         //Format: $MCFBK,n1,n2,state*
+         //state = 2 if it is in safe mode
+         //state = 1 if it is in timeout mode
+         //state = 0 otherwise
+         
+         
+         
+         
+         
+         
+         
+        
     }
     
     
