@@ -15,7 +15,15 @@
 
 
 #define MAX_TASKS 4  //DA CAMBIARE!!!
-#define CIRCULAR_BUFFER_SIZE 15
+//Is important to do some calculatoins:
+//If the baud rate is 9600 --> 9600bits/s are transferred into the communication channel
+//9600bits --> 1200 byte
+//Out main loop is 20ms (50Hz frequency)
+//In a single loop we can fill 1200/50=24 slot of the cb
+//In order to stay in the boundary we declare the cb capacity ceil(2*24) = 50
+//Considering that the firware may have to send to the pc up to 3 messages
+//The capacity of the cb is approximated to 60
+#define CIRCULAR_BUFFER_SIZE 60
 #define TEMP_CIRCULAR_BUFFER_SIZE 10
 
 ///////////////////////////GLOBAL VARIABLES/////////////////////////////////////
@@ -23,6 +31,8 @@ float standby=0;
 char* temp_message_ptr; 
 short int safe_mode = 0;
 short int display=0; //If 0 not pressed
+int velocity_r=0; 
+int velocity_l=0;
 
 typedef struct {
 int n;
@@ -36,8 +46,10 @@ typedef struct {
     int writeIndex;
 } circular_buffer_t;
 
-
+//Cb to take bytes from PC
 volatile circular_buffer_t circularBuffer;
+//Cb to send bytes to PC
+volatile circular_buffer_t cbSendToPc;
 
 void write_cb(volatile circular_buffer_t* cb, char byte) {
     cb->buffer[cb->writeIndex] = byte;
@@ -72,8 +84,6 @@ void __attribute__((__interrupt__,__auto_psv__)) _U2RXInterrupt(){
     while (U2STAbits.URXDA == 1) {
         write_cb(&circularBuffer, U2RXREG);
     }
-    standby=0;
-    LATBbits.LATB1 = 0; // Turn off the led
 }
 
 
@@ -187,6 +197,8 @@ void __attribute__((__interrupt__,__auto_psv__)) _INT0Interrupt(){
     //Stop immediately the motors
     //Setting velocity to zero
     //Is equal to have duty cycle 50%
+    velocity_l = 0;
+    velocity_r = 0;
     PDC1 = 50 * 2 * PTPER;
     PDC2 = 50 * 2 * PTPER;
 }
@@ -207,12 +219,11 @@ void __attribute__((__interrupt__,__auto_psv__)) _INT1Interrupt(){
     }
 }
 
-
 //Function to send enable ack
 void send_ack(char* msg_type,int value){
     //Build message
     char message[15] = "$MCACK,";
-    char value_char;
+    char value_char = NULL;
     sprintf(value_char,"%i",value);
     int j = 0;
     char type[3];
@@ -237,7 +248,7 @@ void send_ack(char* msg_type,int value){
 //Feedback to PC
 void send_MCFBK_ack(int n1,int n2){
     
-    int state;
+    int state = 0;
     if(safe_mode==1){
         state=2;
     }
@@ -251,9 +262,9 @@ void send_MCFBK_ack(int n1,int n2){
     }
     
     char message[15] = "$MCFBK,";
-    char value_char_n1;
-    char value_char_n2;
-    char state_msg;
+    char value_char_n1 = NULL;
+    char value_char_n2 = NULL;
+    char state_msg = NULL;
     sprintf(value_char_n1,"%d",n1);
     sprintf(value_char_n2,"%d",n2);
     sprintf(state_msg,"%i",state);
@@ -293,7 +304,7 @@ void display_0(int temperature, int rpm_l, int rpm_r)
     char message[15]= "ST: ";
     strcat(message,state);
     strcat(message,"; T: ");
-    char temp_char;
+    char temp_char = NULL;
     sprintf(temp_char, "%d", temperature);
     strcat(message,temp_char);
     
@@ -303,13 +314,14 @@ void display_0(int temperature, int rpm_l, int rpm_r)
     spi_put_string(message);
     
     char message2[15]= "R: ";
-    char rpm_r_char;
-    char rpm_l_char;
+    char rpm_r_char = NULL;
+    char rpm_l_char = NULL;
     sprintf(rpm_r_char, "%d", rpm_r);
     sprintf(rpm_l_char, "%d", rpm_l);
     strcat(message2,rpm_l_char);
     strcat(message2,"; ");
     strcat(message2,rpm_r_char);
+    
     spi_clear_second_row();
     spi_move_cursor(SECOND_ROW,0);
     spi_put_string(message2);
@@ -320,8 +332,8 @@ void display_0(int temperature, int rpm_l, int rpm_r)
 void display_1(int min, int max)
 {
     char message[15]= "SA: ";
-    char max_char;
-    char min_char;
+    char max_char = NULL;
+    char min_char = NULL;
     
     sprintf(max_char, "%d", max);
     sprintf(min_char, "%d", min);
@@ -356,8 +368,6 @@ int main(void) {
     
     float duty_cycle_l;
     float duty_cycle_r;
-    int velocity_r=0; 
-    int velocity_l=0;
     int max=9000;
     int min=-9000;
     int user_max=9000;
@@ -369,6 +379,10 @@ int main(void) {
     int ret;
     int main_period=20;
     int temp_count=0;
+    float average;
+    short int sign_temp;
+    int average_count_loop = 0;
+    int send_average_count = 0;
     float temperature_array[10];
     char ack_enable[3] = "ENA";
     char ack_saturation[3] = "SAT";
@@ -388,7 +402,7 @@ int main(void) {
     TRISEbits.TRISE8 = 1; //button S5 as input                                //
     TRISDbits.TRISD0 = 1; //button S6 as input  
     //Initialize PWM////////////////////////////////////////////////////////////
-    //PTPER = 1842; // 1 kHz
+    PTPER = 1842; // 1 kHz
     PTCONbits.PTMOD = 0; // free running
     PTCONbits.PTCKPS = 0; // 1:1 prescaler
     //PTCONbits.PTCKPS = 1; // 1:4 prescaler
@@ -400,7 +414,7 @@ int main(void) {
     //This introduce a computational error
     //Then when duty cycle is 100% the square wave is not exactly constant
     //In this way duty cycle ~= 99.9%
-    PTPER = 920; // 2 KHz
+    //PTPER = 920; // 2 KHz
     PTCONbits.PTEN = 1; // enable pwm
     
     //SPI initialization                                                      //
@@ -420,7 +434,8 @@ int main(void) {
     U2MODEbits.UARTEN = 1; // UART enable                                     //
                                                                               //
     U2STAbits.UTXEN = 1; // unable transmission                               //
-                                                                              //
+    U2STAbits.UTXISEL = 1 // unable interrupt for empty buffer                //                                                                 
+  
     //////////Enable all the interrupts////////////////////////////////////////
     IEC1bits.U2RXIE = 1;   //enable interrupt for UART2 reception             //
     IEC0bits.T2IE = 1;     //enable interrupt for TIMER2                      //
@@ -464,8 +479,8 @@ int main(void) {
         if(standby>=5000)
         {
             //Set velocity motors to zero
-            int velocity_r=0; 
-            int velocity_l=0;
+            velocity_r=0; 
+            velocity_l=0;
        
             //Blink LED D4                                                  
             LATBbits.LATB1 = !LATBbits.LATB1;
@@ -499,6 +514,9 @@ int main(void) {
                     ret = extract_message(pstate.msg_payload, &velocity_l, &velocity_r);
                     // check if all goes well
                     if (ret == 0){
+                        //Reset the counter for time out mode
+                        standby=0;
+                        LATBbits.LATB1 = 0; // Turn off the led
                         // if the velocity is bigger than 1000 RPM saturate it
                         if(velocity_l > max){
                             //saturate to 1000 RPM
@@ -533,10 +551,10 @@ int main(void) {
                     if (ret==0)
                     {
                         //Check that the values are in the correct range
-                        if(user_min<=9000 && user_min>=-9000 && user_max<=9000 && user_max>=-9000)
+                        if(user_min<=0 && user_min>=-9000 && user_max<=9000 && user_max>=0)
                         {
                             //Check that the min, max values are correctly set (i.e., min < max).
-                            if(user_min<=user_max)
+                            if(user_min<user_max)
                             {
                                 send_ack(ack_sat_ptr, 1);
                                 max=user_max;
@@ -562,24 +580,21 @@ int main(void) {
                                 }
                                 
                             }
+                            else{
+                                send_ack(ack_sat_ptr, 0);                                
+                            }
                         }
-                        
-                        send_ack(ack_sat_ptr, 0);
+                        else{
+                            send_ack(ack_sat_ptr, 0);
+                        }
                     }
                 }
             }
             count++;
         }
         
-         ////////////IMPLEMENTING THE SAFE MODE///////////
-         //ENTER IF S5 BUTTON IS PRESSED
-         //1)MOTORS ARE STOPPED UNTIL ENABLE MESSAGE IS RECEIVED
-         //2)AFTER EXIT MOTORS VELOCITY SHOULD BE SET TO 0
-         //3)SEND ACK TO PC ONCE ENABLE COMMAND IS RECEIVED
-         if (safe_mode == 1){
-             velocity_l = 0;
-             velocity_r = 0;
-         }
+         
+        
         //Compute duty cycle
         //Set the correct voltage vlaue on the basis of the RPM
         duty_cycle_l = 1.0/24000 * velocity_l + 0.5;
@@ -591,98 +606,100 @@ int main(void) {
         sprintf(duty_char_l,"%i",duty_int_l);
         sprintf(duty_char_r,"%i",duty_int_r);
         //apply the PWM
+        //since main loop is 50Hz
+        //10 Hz refreshing task is satisfied
         PDC1 = duty_cycle_l * 2 * PTPER;
         PDC2 = duty_cycle_r * 2 * PTPER;
-        int l=0;
         
         //////////// In this section read from AN3 for the temperature /////////
-         int adcValueTemp =ADCBUF1 ; // take the value from  ADC1 buffer 
-         double voltageTemp = adcValueTemp / 1024.0 * 5.0;
-         double temperature = (voltageTemp - 0.75) * 100.0  + 25; //[Celsius]
+        int adcValueTemp =ADCBUF1 ; // take the value from  ADC1 buffer 
+        double voltageTemp = adcValueTemp / 1024.0 * 5.0;
+        double temperature = (voltageTemp - 0.75) * 100.0  + 25; //[Celsius]
          
-         temperature_array[temp_count]=temperature;
-         temp_count+=1;
-         float average=0;
-         if(temp_count==10)
-         {
-             int k=0;
-             float sum=0;
-             for(; k<10; k++)
-             {
-                 sum=temperature_array[k]+sum;
-             }
-             average=sum/10;
-             temp_count=0;
-             
-             
-            short int sign_temp=0;
-             
-            if (average < 0){
-                average = average * (-1);
-                sign_temp = 1;
+        if(average_count_loop == 100){
+            temperature_array[temp_count]=temperature;
+            temp_count+=1;
+            average=0;
+            if(temp_count==10)
+            {
+                int k=0;
+                float sum=0;
+                for(; k<10; k++)
+                {
+                    sum=temperature_array[k]+sum;
+                }
+                average=sum/10;
+                temp_count=0;
+
+
+                sign_temp=0;
+
+                if (average < 0){
+                    average = average * (-1);
+                    sign_temp = 1;
+                }
+
+                else{
+                    sign_temp = 0;
+                }
             }
-             
-            else{
-                sign_temp = 0;
-            }
-             
-             char temp_message[15] = "MCTEM,";
-             //Average of the tempearture in centi celsius in order to speed up 
-             //the sprintf function
-             int average_int = (int)(average * 100);
+            average_count_loop = 0;
+        }     
+        if(send_average_count == 1000){
+            char temp_message[15] = "MCTEM,";
+            //Average of the tempearture in centi celsius in order to speed up 
+            //the sprintf function
+            int average_int = (int)(average * 100);
              
             if(sign_temp){
-             strcat(temp_message,"-");
+                strcat(temp_message,"-");
             }
             else{
                 strcat(temp_message,"+");
             }
              
-             char current_char[5];
+            char current_char[5];
             sprintf(current_char,"%i",average_int);
             strcat(temp_message,current_char);
-
             strcat(temp_message,"*");
-            temp_message_ptr=temp_message;
-         }
+            temp_message_ptr=temp_message; //!!!!!!!!!!!!!!!!!!!!!!!!!!!//
+            send_average_count = 0;
+        }
+        
+        
 
-         //Each 5Hz = 200 ms the feedback is sent to the PC
-         if (count_send_feedback==200)
-         {
-            send_MCFBK_ack(int velocity_l,int velocity_r);
-            count_send_feedback=0;
-         }
+        //Each 5Hz = 200 ms the feedback is sent to the PC
+        if (count_send_feedback==200)
+        {
+           send_MCFBK_ack(velocity_l,velocity_r);
+           count_send_feedback=0;
+        }
          
         //Each 1Hz = 1000 ms blink D3 led
-         if (blink_D3==1000)
-         {
-            LATBbits.LATB0 = !LATBbits.LATB0;
-         }
+        if (blink_D3==1000)
+        {
+           LATBbits.LATB0 = !LATBbits.LATB0;
+           blink_D3=0;
+        }
          
-         //Write on LCD on the basis of button S6
-         IEC1bits.INT1IE =0;
-         if(display==0)
-         {
-             display_0(temperature, velocity_l, velocity_r);
-         }
-         else
-         {
-             display_1(min, max);
-         }
-         IEC1bits.INT1IE =1;
-         ////// BUILD THE MESSAGE TO SEND TO THE PC//////
-         //Format: $MCFBK,n1,n2,state*
-         //state = 2 if it is in safe mode
-         //state = 1 if it is in timeout mode
-         //state = 0 otherwise
-         
-         
-         
-         
-         
-         count_send_feedback+=main_period;
-         blink_D3+=main_period;
-         
+        //Write on LCD on the basis of button S6
+        IEC1bits.INT1IE =0;
+        if(display==0)
+        {
+            display_0(temperature, velocity_l, velocity_r);
+        }
+        else
+        {
+            display_1(min, max);
+        }
+        IEC1bits.INT1IE =1;
+        
+        /////////////UPDATES COUNTER VARIABLES//////////////////////////////////
+        count_send_feedback+=main_period;
+        blink_D3+=main_period;
+        average_count_loop += main_period;
+        send_average_count += main_period; 
+        /////////////WAIT UNTIL main period is elapsed//////////////////////////
         tmr_wait_period(TIMER1);
     }
     
