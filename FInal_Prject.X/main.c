@@ -76,7 +76,7 @@ int avl_bytes_cb(volatile circular_buffer_t* cb) {
 }
 
 
-//ISR for the UART2 
+//ISR for the UART2 reception
 void __attribute__((__interrupt__,__auto_psv__)) _U2RXInterrupt(){
     IFS1bits.U2RXIF = 0; //turn off the flag
     
@@ -86,32 +86,45 @@ void __attribute__((__interrupt__,__auto_psv__)) _U2RXInterrupt(){
     }
 }
 
+//ISR for the UART2 transmission
+void __attribute__((__interrupt__,__auto_psv__)) _U2TXInterrupt(){
+    IFS1bits.U2TXIF = 0; //turn off the flag
+    char byte;
+    read_cb(&cbSendToPc,&byte);
+    U2TXREG = byte;
+}
 
-heartbeat schedInfo[MAX_TASKS];
-    void scheduler() {
-    int i ;
-    int executed = 0;
-    for ( i = 0; i <MAX_TASKS; i++) {
-    schedInfo[i ]. n++;
-    if (schedInfo[i]. n >= schedInfo[i].N) {
-    switch(i) {
-    case 0:
-    // task1() ;
-     break;
-    case 1:
-    // task2() ;
-        break;
-    case 2:
-       // task3() ;
-        break;
+    //ISR when the button S5 is pressed
+void __attribute__((__interrupt__,__auto_psv__)) _INT0Interrupt(){
+    IFS0bits.INT0IF = 0; //turn off the flag
+    safe_mode = 1;
+    //Stop immediately the motors
+    //Setting velocity to zero
+    //Is equal to have duty cycle 50%
+    velocity_l = 0;
+    velocity_r = 0;
+    PDC1 = 50 * 2 * PTPER;
+    PDC2 = 50 * 2 * PTPER;
+}
+
+
+    //ISR when the button S6 is pressed
+void __attribute__((__interrupt__,__auto_psv__)) _INT1Interrupt(){
+    IFS1bits.INT1IF = 0; //turn off the flag
+   
+    //Toggle the state of the display mode
+    if(display==0)
+    {
+        display=1;
     }
-    schedInfo[i]. n = 0;
-    }
+    else
+    {
+        display=0;
     }
 }
+
     
-    
-    //Analog to digital converter initialization
+//Analog to digital converter initialization
 void adc_configuration() {
     ADCON3bits.ADCS = 8;
     //ADCON1bits.ASAM = 0; // manual sampling start
@@ -190,34 +203,6 @@ void adc_configuration() {
         return 0;
     }
     
-    //ISR when the button S5 is pressed
-void __attribute__((__interrupt__,__auto_psv__)) _INT0Interrupt(){
-    IFS0bits.INT0IF = 0; //turn off the flag
-    safe_mode = 1;
-    //Stop immediately the motors
-    //Setting velocity to zero
-    //Is equal to have duty cycle 50%
-    velocity_l = 0;
-    velocity_r = 0;
-    PDC1 = 50 * 2 * PTPER;
-    PDC2 = 50 * 2 * PTPER;
-}
-
-
-    //ISR when the button S6 is pressed
-void __attribute__((__interrupt__,__auto_psv__)) _INT1Interrupt(){
-    IFS1bits.INT1IF = 0; //turn off the flag
-   
-    //Toggle the state of the display mode
-    if(display==0)
-    {
-        display=1;
-    }
-    else
-    {
-        display=0;
-    }
-}
 
 //Function to send enable ack
 void send_ack(char* msg_type,int value){
@@ -238,8 +223,12 @@ void send_ack(char* msg_type,int value){
     int k = 0;
     int str_len = strlen(message);
     for (;k<str_len;k++){
-        while(U2STAbits.UTXBF); /// AGGIUSTA IL BUSY WAITING!!!!!!
-        U2TXREG = message[k];
+        //disable interrupt for transmission
+        IEC1bits.U2TXIE = 0;
+        //write on the buffer the characters
+        write_cb(&cbSendToPc,message[k]);
+        //enable interrupt for transmission
+        IEC1bits.U2TXIE = 1;
     }
 }
 
@@ -279,8 +268,12 @@ void send_MCFBK_ack(int n1,int n2){
     int k = 0;
     int str_len = strlen(message);
     for (;k<str_len;k++){
-        while(U2STAbits.UTXBF); /// AGGIUSTA IL BUSY WAITING!!!!!!
-        U2TXREG = message[k];
+        //disable interrupt for transmission
+        IEC1bits.U2TXIE = 0;
+        //write on the buffer the characters
+        write_cb(&cbSendToPc,message[k]);
+        //enable interrupt for transmission
+        IEC1bits.U2TXIE = 1;
     }
 }
 
@@ -434,14 +427,16 @@ int main(void) {
     U2MODEbits.UARTEN = 1; // UART enable                                     //
                                                                               //
     U2STAbits.UTXEN = 1; // unable transmission                               //
-    U2STAbits.UTXISEL = 1 // unable interrupt for empty buffer                //                                                                 
-  
-    //////////Enable all the interrupts////////////////////////////////////////
+    // interrupt fires when at least one character can be written             //
+    U2STAbits.UTXISEL = 0;                                                    //                                                                 
+            
+    //////////Enable all the interrupts/////////////////////////////////////////
+    IEC1bits.U2TXIE = 1    //enable interrupt for UART2 transmission          //
     IEC1bits.U2RXIE = 1;   //enable interrupt for UART2 reception             //
     IEC0bits.T2IE = 1;     //enable interrupt for TIMER2                      //
     IEC0bits.T3IE = 1;     //enable interrupt fot TIMER3                      //
     IEC0bits.INT0IE = 1;   //enable interrupt for button S5                   //
-    IEC1bits.INT1IE =1;   //enable interrupt for button S6                   //
+    IEC1bits.INT1IE =1;   //enable interrupt for button S6                    //
     ////////////////////////////////////////////////////////////////////////////
        
     // parser initialization////////////////////////////////////////////////////
@@ -450,7 +445,8 @@ int main(void) {
     pstate.index_type = 0;                                                    //
     pstate.index_payload = 0;                                                 //
     ////////////////////////////////////////////////////////////////////////////
-        //Initialize PWM////////////////////////////////////////////////////////
+        
+    //////////////////Initialize PWM////////////////////////////////////////////
     PTPER = 1842; // 1 kHz
     PTCONbits.PTMOD = 0; // free running
     PTCONbits.PTCKPS = 0; // 1:1 prescaler
@@ -662,7 +658,15 @@ int main(void) {
             sprintf(current_char,"%i",average_int);
             strcat(temp_message,current_char);
             strcat(temp_message,"*");
-            temp_message_ptr=temp_message; //!!!!!!!!!!!!!!!!!!!!!!!!!!!//
+            int q=0;
+            for(;q<strlen(temp_message);q++){
+                char temp_byte;
+                //disable interrupt
+                IEC1bits.U2TXIE = 0;
+                write_cb(cbSendToPc,&temp_byte);
+                //enable interrupt
+                IEC1bits.U2TXIE = 1;
+            }
             send_average_count = 0;
         }
         
