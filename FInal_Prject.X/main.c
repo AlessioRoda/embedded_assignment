@@ -431,7 +431,7 @@ int main(void) {
     U2STAbits.UTXISEL = 0;                                                    //                                                                 
             
     //////////Enable all the interrupts/////////////////////////////////////////
-    IEC1bits.U2TXIE = 1    //enable interrupt for UART2 transmission          //
+    IEC1bits.U2TXIE = 1;    //enable interrupt for UART2 transmission          //
     IEC1bits.U2RXIE = 1;   //enable interrupt for UART2 reception             //
     IEC0bits.T2IE = 1;     //enable interrupt for TIMER2                      //
     IEC0bits.T3IE = 1;     //enable interrupt fot TIMER3                      //
@@ -660,10 +660,10 @@ int main(void) {
             strcat(temp_message,"*");
             int q=0;
             for(;q<strlen(temp_message);q++){
-                char temp_byte;
+                char temp_byte=NULL;
                 //disable interrupt
                 IEC1bits.U2TXIE = 0;
-                write_cb(cbSendToPc,&temp_byte);
+                write_cb(&cbSendToPc,temp_byte);
                 //enable interrupt
                 IEC1bits.U2TXIE = 1;
             }
