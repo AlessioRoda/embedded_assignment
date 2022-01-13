@@ -27,12 +27,14 @@
 #define TEMP_CIRCULAR_BUFFER_SIZE 10
 
 ///////////////////////////GLOBAL VARIABLES/////////////////////////////////////
-float standby=0; 
+int standby=0; 
 char* temp_message_ptr; 
 short int safe_mode = 0;
 short int display=0; //If 0 not pressed
 int velocity_r=0; 
 int velocity_l=0;
+char ack_enable[4] = "ENA";
+char ack_saturation[4] = "SAT";
 
 typedef struct {
 int n;
@@ -240,17 +242,21 @@ void adc_configuration() {
     
 
 //Function to send enable ack
-void send_ack(char* msg_type,int value){
+void send_ack(int msg_type,int value){
     //Build message
     char message[15] = "$MCACK,";
-    char value_char = NULL;
+    char value_char[1];
     sprintf(value_char,"%i",value);
-    int j = 0;
-    char type[3];
-    for(;j<3;j++){
-        type[j] = (msg_type +j);
+    
+    if(msg_type==0)
+    {
+        strcat(message,ack_saturation);
     }
-    strcat(message,type);
+    else
+    {
+        strcat(message,ack_enable);
+    }
+    
     strcat(message,",");
     strcat(message,value_char);
     strcat(message,"*");
@@ -262,6 +268,15 @@ void send_ack(char* msg_type,int value){
         IEC1bits.U2TXIE = 0;
         //write on the buffer the characters
         write_cb(&cbSendToPc,message[k]);
+        if(U2STAbits.UTXBF==0)
+        {
+            char byte;
+            int ret=read_cb(&cbSendToPc, &byte);
+            if(ret==0)
+            {
+                U2TXREG = byte;
+            }
+        }
         //enable interrupt for transmission
         IEC1bits.U2TXIE = 1;
     }
@@ -307,6 +322,16 @@ void send_MCFBK_ack(int n1,int n2){
         IEC1bits.U2TXIE = 0;
         //write on the buffer the characters
         write_cb(&cbSendToPc,message[k]);
+        
+         if(U2STAbits.UTXBF==0)
+        {
+            char byte;
+            int ret=read_cb(&cbSendToPc, &byte);
+            if(ret==0)
+            {
+                U2TXREG = byte;
+            }
+        }
         //enable interrupt for transmission
         IEC1bits.U2TXIE = 1;
     }
@@ -407,15 +432,12 @@ int main(void) {
     int ret;
     int main_period=20;
     int temp_count=0;
+    int standby_count=0;
     float average;
     short int sign_temp;
     int average_count_loop = 0;
     int send_average_count = 0;
     float temperature_array[10];
-    char ack_enable[3] = "ENA";
-    char ack_saturation[3] = "SAT";
-    char* ack_en_ptr = &ack_enable[0];
-    char* ack_sat_ptr = &ack_saturation[0];
     
     
     ////////DECLARE THE LED D4 as OUTPUT////////////////////////////////////////
@@ -507,12 +529,13 @@ int main(void) {
         //Disable the UART interrupt
         IEC1bits.U2RXIE = 0;
         
-        standby+=main_period;
-        if(standby>=5000)
+        standby_count+=main_period;
+        if(standby_count>=5000)
         {
             //Set velocity motors to zero
             velocity_r=0; 
             velocity_l=0;
+            standby=1;
        
             //Blink LED D4                                                  
             LATBbits.LATB1 = !LATBbits.LATB1;
@@ -527,7 +550,7 @@ int main(void) {
         //initialize a counter to compare the free space in cb
         count = 0;
         //while loop until we have available space in cb
-        while(count<avl && standby<5000){
+        while(count<avl && standby_count<5000){
             //variable to store the current byte in cb
             char byte;
             //disable UART interrupt
@@ -547,7 +570,8 @@ int main(void) {
                     // check if all goes well
                     if (ret == 0){
                         //Reset the counter for time out mode
-                        standby=0;
+                        standby_count=0;
+                        standby=0; //Turns off the stanby mode
                         LATBbits.LATB1 = 0; // Turn off the led
                         // if the velocity is bigger than 1000 RPM saturate it
                         if(velocity_l > max){
@@ -574,7 +598,7 @@ int main(void) {
                     //disable S5 interrupt
                     IEC0bits.INT0IE = 0;
                     safe_mode = 0;
-                    send_ack(ack_en_ptr,1);
+                    send_ack(1,1); //Send enable ack, 1 as first argument
                     IEC0bits.INT0IE = 1;
                 }
                 if(strcmp(pstate.msg_type, "HLSAT") == 0)
@@ -588,7 +612,7 @@ int main(void) {
                             //Check that the min, max values are correctly set (i.e., min < max).
                             if(user_min<user_max)
                             {
-                                send_ack(ack_sat_ptr, 1);
+                                send_ack(0, 1); //Sed saturation ack 0 as first argument
                                 max=user_max;
                                 min=user_min;
                                 
@@ -613,11 +637,11 @@ int main(void) {
                                 
                             }
                             else{
-                                send_ack(ack_sat_ptr, 0);                                
+                                send_ack(0, 0);                                
                             }
                         }
                         else{
-                            send_ack(ack_sat_ptr, 0);
+                            send_ack(0, 0);
                         }
                     }
                 }
@@ -700,6 +724,15 @@ int main(void) {
                 //disable interrupt
                 IEC1bits.U2TXIE = 0;
                 write_cb(&cbSendToPc,temp_byte);
+                if(U2STAbits.UTXBF==0)
+                {
+                    char byte;
+                    int ret=read_cb(&cbSendToPc, &byte);
+                    if(ret==0)
+                    {
+                        U2TXREG = byte;
+                    }
+                }          
                 //enable interrupt
                 IEC1bits.U2TXIE = 1;
             }

@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <project>
-  <executable name="dist/default/debug/FinalProject.X.debug.elf">
+  <executable name="dist/default/debug/FInal_Prject.X.debug.elf">
     <memory name="data">
       <units>bytes</units>
       <length>2048</length>
-      <used>350</used>
-      <free>1698</free>
+      <used>356</used>
+      <free>1692</free>
     </memory>
     <memory name="program">
       <units>bytes</units>
       <length>48768</length>
-      <used>15033</used>
-      <free>33735</free>
+      <used>15018</used>
+      <free>33750</free>
     </memory>
   </executable>
 </project>
