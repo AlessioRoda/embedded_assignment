@@ -286,9 +286,9 @@ void send_MCFBK_ack(int n1,int n2){
     }
     
     char message[15] = "$MCFBK,";
-    char value_char_n1 = NULL;
-    char value_char_n2 = NULL;
-    char state_msg = NULL;
+    char value_char_n1[5] ;
+    char value_char_n2[5];
+    char state_msg[1];
     sprintf(value_char_n1,"%d",n1);
     sprintf(value_char_n2,"%d",n2);
     sprintf(state_msg,"%i",state);
@@ -456,7 +456,7 @@ int main(void) {
     
     //UART2 Initialization /////////////////////////////////////////////////////
                                                                               //             
-    U2BRG = 11; //set the baud rate register: (7372800 / 4) / (16 * 9600)-1   //  VERIFICA CHE VADA BENE!!!!!!
+    U2BRG = 11; //set the baud rate register: (7372800 / 4) / (16 * 9600)-1   //
     U2MODEbits.STSEL = 0; // 1 stop bit                                       //
     U2MODEbits.PDSEL = 0b00; // 8 bit no parity                               //
     U2MODEbits.UARTEN = 1; // UART enable                                     //
@@ -465,15 +465,7 @@ int main(void) {
     // interrupt fires when at least one character can be written             //
     U2STAbits.UTXISEL = 0;                                                    //                                                                 
             
-    //////////Enable all the interrupts/////////////////////////////////////////
-    IEC1bits.U2TXIE = 1;    //enable interrupt for UART2 transmission          //
-    IEC1bits.U2RXIE = 1;   //enable interrupt for UART2 reception             //
-    IEC0bits.T2IE = 1;     //enable interrupt for TIMER2                      //
-    IEC0bits.T3IE = 1;     //enable interrupt fot TIMER3                      //
-    IEC0bits.INT0IE = 1;   //enable interrupt for button S5                   //
-    IEC1bits.INT1IE =1;   //enable interrupt for button S6                    //
-    ////////////////////////////////////////////////////////////////////////////
-       
+
     // parser initialization////////////////////////////////////////////////////
     parser_state pstate;                                                      //
     pstate.state = STATE_DOLLAR;                                              //
@@ -498,6 +490,15 @@ int main(void) {
     PTCONbits.PTEN = 1; // enable pwm
     ////////////////////////////////////////////////////////////////////////////
     
+    //////////////Enable all the interrupts/////////////////////////////////////
+    IEC1bits.U2TXIE = 1;    //enable interrupt for UART2 transmission         //
+    IEC1bits.U2RXIE = 1;   //enable interrupt for UART2 reception             //
+    IEC0bits.T2IE = 1;     //enable interrupt for TIMER2                      //
+    IEC0bits.T3IE = 1;     //enable interrupt fot TIMER3                      //
+    IEC0bits.INT0IE = 1;   //enable interrupt for button S5                   //
+    IEC1bits.INT1IE =1;   //enable interrupt for button S6                    //
+    ////////////////////////////////////////////////////////////////////////////
+       
     tmr_setup_period(TIMER1, main_period);
     
     while(1)
