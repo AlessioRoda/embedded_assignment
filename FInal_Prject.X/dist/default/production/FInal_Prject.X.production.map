@@ -166,10 +166,10 @@ section                    address   length (PC units)   length (bytes) (dec)
 -------                    -------   -----------------   --------------------
 .text                        0x100              0x1554          0x1ffe  (8190)
 .const                      0x1654                0x48            0x6c  (108)
-.text                       0x169c               0xfbc          0x179a  (6042)
-.dinit                      0x2658                0xc2           0x123  (291)
+.text                       0x169c              0x10d6          0x1941  (6465)
+.dinit                      0x2772                0xc2           0x123  (291)
 
-                 Total "program" memory used (bytes):         0x3927  (14631) 30%
+                 Total "program" memory used (bytes):         0x3ace  (15054) 30%
 
 
 "data" Memory  [Origin = 0x800, Length = 0x800]
@@ -312,22 +312,22 @@ External Symbols in Program Memory (by address):
                   0x001714                  _avl_bytes_cb
                   0x001742                  _adc_configuration
                   0x001790                  _extract_message
-                  0x001870                  _send_ack
-                  0x00191a                  _send_MCFBK_ack
-                  0x001a12                  _display_0
-                  0x001afe                  _display_1
-                  0x001bce                  _main
-                  0x002116                  _choose_prescaler
-                  0x002206                  _tmr_wait_ms
-                  0x0022e8                  _tmr_setup_period
-                  0x00238e                  _tmr_wait_period
-                  0x002402                  _spi_put_char
-                  0x002418                  _spi_put_string
-                  0x00243e                  _spi_move_cursor
-                  0x00246c                  _spi_clear_first_row
-                  0x00248e                  _spi_clear_second_row
-                  0x0024b0                  _parse_byte
-                  0x0025aa                  _extract_integer
+                  0x00198a                  _send_ack
+                  0x001a34                  _send_MCFBK_ack
+                  0x001b2c                  _display_0
+                  0x001c18                  _display_1
+                  0x001ce8                  _main
+                  0x002230                  _choose_prescaler
+                  0x002320                  _tmr_wait_ms
+                  0x002402                  _tmr_setup_period
+                  0x0024a8                  _tmr_wait_period
+                  0x00251c                  _spi_put_char
+                  0x002532                  _spi_put_string
+                  0x002558                  _spi_move_cursor
+                  0x002586                  _spi_clear_first_row
+                  0x0025a8                  _spi_clear_second_row
+                  0x0025ca                  _parse_byte
+                  0x0026c4                  _extract_integer
 
 External Symbols in Program Memory (by name):
 
@@ -390,33 +390,33 @@ External Symbols in Program Memory (by name):
                   0x000788                  __sprintf_cdnopuxX
                   0x001742                  _adc_configuration
                   0x001714                  _avl_bytes_cb
-                  0x002116                  _choose_prescaler
-                  0x001a12                  _display_0
-                  0x001afe                  _display_1
+                  0x002230                  _choose_prescaler
+                  0x001b2c                  _display_0
+                  0x001c18                  _display_1
                   0x000f98                  _efwrite
-                  0x0025aa                  _extract_integer
+                  0x0026c4                  _extract_integer
                   0x001790                  _extract_message
                   0x00118a                  _fclose
                   0x001252                  _free
-                  0x001bce                  _main
+                  0x001ce8                  _main
                   0x00131c                  _malloc
                   0x000712                  _memcpy
-                  0x0024b0                  _parse_byte
+                  0x0025ca                  _parse_byte
                   0x0016dc                  _read_cb
-                  0x00191a                  _send_MCFBK_ack
-                  0x001870                  _send_ack
-                  0x00246c                  _spi_clear_first_row
-                  0x00248e                  _spi_clear_second_row
-                  0x00243e                  _spi_move_cursor
-                  0x002402                  _spi_put_char
-                  0x002418                  _spi_put_string
+                  0x001a34                  _send_MCFBK_ack
+                  0x00198a                  _send_ack
+                  0x002586                  _spi_clear_first_row
+                  0x0025a8                  _spi_clear_second_row
+                  0x002558                  _spi_move_cursor
+                  0x00251c                  _spi_put_char
+                  0x002532                  _spi_put_string
                   0x000720                  _strcat
                   0x000b6a                  _strchr
                   0x000734                  _strcmp
                   0x000754                  _strlen
-                  0x0022e8                  _tmr_setup_period
-                  0x002206                  _tmr_wait_ms
-                  0x00238e                  _tmr_wait_period
+                  0x002402                  _tmr_setup_period
+                  0x002320                  _tmr_wait_ms
+                  0x0024a8                  _tmr_wait_period
                   0x00169c                  _write_cb
                   0x00121a                  fclose.XX_elo:_closeall
                   0x000760                  sprintf_cdnopuxX.XXeo:_eprout
@@ -714,11 +714,11 @@ userdata
  *(.comment)
  .comment         0x000000         0x5e c:/program files/microchip/xc16/v1.70/bin/bin/../../lib\liblega-c-elf.a(xfiles.XX_elo)
 
-.debug_info       0x000000       0x361d
+.debug_info       0x000000       0x36d8
  *(.debug_info)
- .debug_info      0x000000       0x291c build/default/production/main.o
- .debug_info      0x00291c        0xad7 build/default/production/assignment.o
- .debug_info      0x0033f3        0x22a build/default/production/parser.o
+ .debug_info      0x000000       0x29d7 build/default/production/main.o
+ .debug_info      0x0029d7        0xad7 build/default/production/assignment.o
+ .debug_info      0x0034ae        0x22a build/default/production/parser.o
  *(.gnu.linkonce.wi.*)
 
 .debug_abbrev     0x000000        0x49c
@@ -727,17 +727,17 @@ userdata
  .debug_abbrev    0x000274        0x187 build/default/production/assignment.o
  .debug_abbrev    0x0003fb         0xa1 build/default/production/parser.o
 
-.debug_line       0x000000        0x4e2
+.debug_line       0x000000        0x4fd
  *(.debug_line)
- .debug_line      0x000000        0x2c4 build/default/production/main.o
- .debug_line      0x0002c4        0x19d build/default/production/assignment.o
- .debug_line      0x000461         0x81 build/default/production/parser.o
+ .debug_line      0x000000        0x2df build/default/production/main.o
+ .debug_line      0x0002df        0x19d build/default/production/assignment.o
+ .debug_line      0x00047c         0x81 build/default/production/parser.o
 
-.debug_frame      0x000000        0x3c8
+.debug_frame      0x000000        0x3ca
  *(.debug_frame)
- .debug_frame     0x000000        0x278 build/default/production/main.o
- .debug_frame     0x000278        0x108 build/default/production/assignment.o
- .debug_frame     0x000380         0x48 build/default/production/parser.o
+ .debug_frame     0x000000        0x27a build/default/production/main.o
+ .debug_frame     0x00027a        0x108 build/default/production/assignment.o
+ .debug_frame     0x000382         0x48 build/default/production/parser.o
 
 .debug_str        0x000000        0x197
  *(.debug_str)
@@ -1661,31 +1661,31 @@ __c30_signature
 .const              0x9654         0x48 load address 0x001654  
  .const             0x9654         0x48 build/default/production/main.o
 
-.text             0x00169c        0xfbc
- .text            0x00169c        0xa7a build/default/production/main.o
+.text             0x00169c       0x10d6
+ .text            0x00169c        0xb94 build/default/production/main.o
                   0x00169c                  _write_cb
                   0x0016dc                  _read_cb
                   0x001714                  _avl_bytes_cb
                   0x001742                  _adc_configuration
                   0x001790                  _extract_message
-                  0x001870                  _send_ack
-                  0x00191a                  _send_MCFBK_ack
-                  0x001a12                  _display_0
-                  0x001afe                  _display_1
-                  0x001bce                  _main
- .text            0x002116        0x39a build/default/production/assignment.o
-                  0x002116                  _choose_prescaler
-                  0x002206                  _tmr_wait_ms
-                  0x0022e8                  _tmr_setup_period
-                  0x00238e                  _tmr_wait_period
-                  0x002402                  _spi_put_char
-                  0x002418                  _spi_put_string
-                  0x00243e                  _spi_move_cursor
-                  0x00246c                  _spi_clear_first_row
-                  0x00248e                  _spi_clear_second_row
- .text            0x0024b0        0x1a8 build/default/production/parser.o
-                  0x0024b0                  _parse_byte
-                  0x0025aa                  _extract_integer
+                  0x00198a                  _send_ack
+                  0x001a34                  _send_MCFBK_ack
+                  0x001b2c                  _display_0
+                  0x001c18                  _display_1
+                  0x001ce8                  _main
+ .text            0x002230        0x39a build/default/production/assignment.o
+                  0x002230                  _choose_prescaler
+                  0x002320                  _tmr_wait_ms
+                  0x002402                  _tmr_setup_period
+                  0x0024a8                  _tmr_wait_period
+                  0x00251c                  _spi_put_char
+                  0x002532                  _spi_put_string
+                  0x002558                  _spi_move_cursor
+                  0x002586                  _spi_clear_first_row
+                  0x0025a8                  _spi_clear_second_row
+ .text            0x0025ca        0x1a8 build/default/production/parser.o
+                  0x0025ca                  _parse_byte
+                  0x0026c4                  _extract_integer
 
-.dinit            0x002658         0xc2
- .dinit           0x002658         0xc2 data_init
+.dinit            0x002772         0xc2
+ .dinit           0x002772         0xc2 data_init

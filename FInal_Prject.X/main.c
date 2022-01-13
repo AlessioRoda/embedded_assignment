@@ -60,10 +60,15 @@ void write_cb(volatile circular_buffer_t* cb, char byte) {
     }
 }
 
-void read_cb(volatile circular_buffer_t* cb, char* byte) {
+int read_cb(volatile circular_buffer_t* cb, char* byte) {
     if (cb->readIndex != cb->writeIndex) {
         *byte = cb->buffer[cb->readIndex];
         cb->readIndex = (cb->readIndex + 1) % CIRCULAR_BUFFER_SIZE;
+        return 0;
+    }
+    else
+    {
+        return -1;
     }
 }
 
@@ -90,8 +95,11 @@ void __attribute__((__interrupt__,__auto_psv__)) _U2RXInterrupt(){
 void __attribute__((__interrupt__,__auto_psv__)) _U2TXInterrupt(){
     IFS1bits.U2TXIF = 0; //turn off the flag
     char byte;
-    read_cb(&cbSendToPc,&byte);
-    U2TXREG = byte;
+    int ret=read_cb(&cbSendToPc,&byte);
+    if (ret==0)
+    {
+        U2TXREG = byte;
+    }
 }
 
     //ISR when the button S5 is pressed
@@ -157,6 +165,17 @@ void adc_configuration() {
         int len= strlen(str);
         char string1[len];
         char string2[len];
+       int k=0;
+       char prova[len];
+        for (; k<len; k++)
+        {
+            prova[k]=str[k];
+        }
+       
+       char a,b,c;
+       a=prova[0];
+       b=prova[1];
+       c=prova[2];
         
         
         int i;
@@ -167,7 +186,15 @@ void adc_configuration() {
             if(str[i]==',')
             {
                 
-               char* string_to_send= string1; 
+              // char* string_to_send= string1; 
+                char string_to_send[i+1];
+                int k=0;
+                for(;k<i; k++)
+                {
+                    string_to_send[k]=string1[k];
+                }
+                string_to_send[i]='\0';
+                
                 flag= extract_integer(string_to_send, n1);
                 
                 if(flag==-1)
@@ -180,7 +207,14 @@ void adc_configuration() {
             
             if(str[i]=='\0')
             {
-                char* string_to_send= string2;
+               // char* string_to_send= string2;
+                char string_to_send[i-j+1];
+                int k=0;
+                for(;k<i-j; k++)
+                {
+                    string_to_send[k]=string2[k];
+                }
+                string_to_send[i-j]='\0';
                 flag= extract_integer(string_to_send, n2);
                 
                 if(flag==-1)
@@ -193,6 +227,7 @@ void adc_configuration() {
             if(flag==1)
             {
                 string1[i]=str[i];
+                char c=string1[i];
             }
             else
             {
