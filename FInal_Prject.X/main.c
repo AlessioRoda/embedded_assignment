@@ -398,8 +398,8 @@ void display_0(int temperature, int rpm_l, int rpm_r)
 void display_1(int min, int max)
 {
     char message[15]= "SA: ";
-    char max_char = NULL;
-    char min_char = NULL;
+    char max_char[5];
+    char min_char[5];
     
     sprintf(max_char, "%d", max);
     sprintf(min_char, "%d", min);
@@ -413,8 +413,8 @@ void display_1(int min, int max)
     spi_put_string(message);
     
     char message2[15]= "R: ";
-    char duty_char_1;
-    char duty_char_2;
+    char duty_char_1[5];
+    char duty_char_2[5];
     sprintf(duty_char_1, "%d", PDC1);
     sprintf(duty_char_2, "%d", PDC2);
     strcat(message2,duty_char_1);
@@ -755,7 +755,7 @@ int main(void) {
          
         //Each 1Hz = 1000 ms blink D3 led
         //Change state only 500ms
-        if (blink_D3==1000)
+        if (blink_D3==500)
         {
            LATBbits.LATB0 = !LATBbits.LATB0;
            blink_D3=0;
