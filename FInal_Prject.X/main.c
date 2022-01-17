@@ -5,6 +5,40 @@
  * Created on 30 dicembre 2021, 10.32
  */
 
+
+// DSPIC30F4011 Configuration Bit Settings
+
+// 'C' source line config statements
+
+// FOSC
+#pragma config FPR = XT                 // Primary Oscillator Mode (XT)
+#pragma config FOS = FRC                // Oscillator Source (Internal Fast RC)
+#pragma config FCKSMEN = CSW_FSCM_OFF   // Clock Switching and Monitor (Sw Disabled, Mon Disabled)
+
+// FWDT
+#pragma config FWPSB = WDTPSB_16        // WDT Prescaler B (1:16)
+#pragma config FWPSA = WDTPSA_512       // WDT Prescaler A (1:512)
+#pragma config WDT = WDT_OFF            // Watchdog Timer (Disabled)
+
+// FBORPOR
+#pragma config FPWRT = PWRT_64          // POR Timer Value (64ms)
+#pragma config BODENV = BORV20          // Brown Out Voltage (Reserved)
+#pragma config BOREN = PBOR_ON          // PBOR Enable (Enabled)
+#pragma config LPOL = PWMxL_ACT_HI      // Low-side PWM Output Polarity (Active High)
+#pragma config HPOL = PWMxH_ACT_HI      // High-side PWM Output Polarity (Active High)
+#pragma config PWMPIN = RST_IOPIN       // PWM Output Pin Reset (Control with PORT/TRIS regs)
+#pragma config MCLRE = MCLR_EN          // Master Clear Enable (Enabled)
+
+// FGS
+#pragma config GWRP = GWRP_OFF          // General Code Segment Write Protect (Disabled)
+#pragma config GCP = CODE_PROT_OFF      // General Segment Code Protection (Disabled)
+
+// FICD
+#pragma config ICS = ICS_PGD            // Comm Channel Select (Use PGC/EMUC and PGD/EMUD)
+
+// #pragma config statements should precede project file includes.
+// Use project enums instead of #define for ON and OFF.
+
 #include <xc.h>
 
 #include <stdio.h>
@@ -27,14 +61,12 @@
 #define TEMP_CIRCULAR_BUFFER_SIZE 10
 
 ///////////////////////////GLOBAL VARIABLES/////////////////////////////////////
-int standby=0; 
+float standby=0; 
 char* temp_message_ptr; 
 short int safe_mode = 0;
 short int display=0; //If 0 not pressed
 int velocity_r=0; 
 int velocity_l=0;
-char ack_enable[4] = "ENA";
-char ack_saturation[4] = "SAT";
 
 typedef struct {
 int n;
@@ -242,21 +274,17 @@ void adc_configuration() {
     
 
 //Function to send enable ack
-void send_ack(int msg_type,int value){
+void send_ack(char* msg_type,int value){
     //Build message
     char message[15] = "$MCACK,";
-    char value_char[1];
+    char value_char = NULL;
     sprintf(value_char,"%i",value);
-    
-    if(msg_type==0)
-    {
-        strcat(message,ack_saturation);
+    int j = 0;
+    char type[3];
+    for(;j<3;j++){
+        type[j] = (msg_type +j);
     }
-    else
-    {
-        strcat(message,ack_enable);
-    }
-    
+    strcat(message,type);
     strcat(message,",");
     strcat(message,value_char);
     strcat(message,"*");
@@ -268,15 +296,6 @@ void send_ack(int msg_type,int value){
         IEC1bits.U2TXIE = 0;
         //write on the buffer the characters
         write_cb(&cbSendToPc,message[k]);
-        if(U2STAbits.UTXBF==0)
-        {
-            char byte;
-            int ret=read_cb(&cbSendToPc, &byte);
-            if(ret==0)
-            {
-                U2TXREG = byte;
-            }
-        }
         //enable interrupt for transmission
         IEC1bits.U2TXIE = 1;
     }
@@ -322,16 +341,6 @@ void send_MCFBK_ack(int n1,int n2){
         IEC1bits.U2TXIE = 0;
         //write on the buffer the characters
         write_cb(&cbSendToPc,message[k]);
-        
-         if(U2STAbits.UTXBF==0)
-        {
-            char byte;
-            int ret=read_cb(&cbSendToPc, &byte);
-            if(ret==0)
-            {
-                U2TXREG = byte;
-            }
-        }
         //enable interrupt for transmission
         IEC1bits.U2TXIE = 1;
     }
@@ -341,23 +350,27 @@ void send_MCFBK_ack(int n1,int n2){
 void display_0(int temperature, int rpm_l, int rpm_r)
 {
     //Check the state
-    char state;
+    //char state;
+    char message[15]= "ST: ";
     if(safe_mode==1){
-        state='H';
+        //state='H';
+        strcat(message,"H");
     }
     else if(standby==1)
     {
-        state='T';
+        //state='T';
+        strcat(message,"T");
     }
     else
     {
-        state='C';
+       //state='C';
+        strcat(message,"C");
     }
     
-    char message[15]= "ST: ";
-    strcat(message,state);
+    
+    //strcat(message,state);
     strcat(message,"; T: ");
-    char temp_char = NULL;
+    char temp_char[6];
     sprintf(temp_char, "%d", temperature);
     strcat(message,temp_char);
     
@@ -367,8 +380,8 @@ void display_0(int temperature, int rpm_l, int rpm_r)
     spi_put_string(message);
     
     char message2[15]= "R: ";
-    char rpm_r_char = NULL;
-    char rpm_l_char = NULL;
+    char rpm_r_char[5];
+    char rpm_l_char[5];
     sprintf(rpm_r_char, "%d", rpm_r);
     sprintf(rpm_l_char, "%d", rpm_l);
     strcat(message2,rpm_l_char);
@@ -432,12 +445,15 @@ int main(void) {
     int ret;
     int main_period=20;
     int temp_count=0;
-    int standby_count=0;
     float average;
     short int sign_temp;
     int average_count_loop = 0;
     int send_average_count = 0;
     float temperature_array[10];
+    char ack_enable[3] = "ENA";
+    char ack_saturation[3] = "SAT";
+    char* ack_en_ptr = &ack_enable[0];
+    char* ack_sat_ptr = &ack_saturation[0];
     
     
     ////////DECLARE THE LED D4 as OUTPUT////////////////////////////////////////
@@ -529,13 +545,12 @@ int main(void) {
         //Disable the UART interrupt
         IEC1bits.U2RXIE = 0;
         
-        standby_count+=main_period;
-        if(standby_count>=5000)
+        standby+=main_period;
+        if(standby>=5000)
         {
             //Set velocity motors to zero
             velocity_r=0; 
             velocity_l=0;
-            standby=1;
        
             //Blink LED D4                                                  
             LATBbits.LATB1 = !LATBbits.LATB1;
@@ -550,7 +565,7 @@ int main(void) {
         //initialize a counter to compare the free space in cb
         count = 0;
         //while loop until we have available space in cb
-        while(count<avl && standby_count<5000){
+        while(count<avl && standby<5000){
             //variable to store the current byte in cb
             char byte;
             //disable UART interrupt
@@ -570,8 +585,7 @@ int main(void) {
                     // check if all goes well
                     if (ret == 0){
                         //Reset the counter for time out mode
-                        standby_count=0;
-                        standby=0; //Turns off the stanby mode
+                        standby=0;
                         LATBbits.LATB1 = 0; // Turn off the led
                         // if the velocity is bigger than 1000 RPM saturate it
                         if(velocity_l > max){
@@ -598,7 +612,7 @@ int main(void) {
                     //disable S5 interrupt
                     IEC0bits.INT0IE = 0;
                     safe_mode = 0;
-                    send_ack(1,1); //Send enable ack, 1 as first argument
+                    send_ack(ack_en_ptr,1);
                     IEC0bits.INT0IE = 1;
                 }
                 if(strcmp(pstate.msg_type, "HLSAT") == 0)
@@ -612,7 +626,7 @@ int main(void) {
                             //Check that the min, max values are correctly set (i.e., min < max).
                             if(user_min<user_max)
                             {
-                                send_ack(0, 1); //Sed saturation ack 0 as first argument
+                                send_ack(ack_sat_ptr, 1);
                                 max=user_max;
                                 min=user_min;
                                 
@@ -637,11 +651,11 @@ int main(void) {
                                 
                             }
                             else{
-                                send_ack(0, 0);                                
+                                send_ack(ack_sat_ptr, 0);                                
                             }
                         }
                         else{
-                            send_ack(0, 0);
+                            send_ack(ack_sat_ptr, 0);
                         }
                     }
                 }
@@ -724,15 +738,6 @@ int main(void) {
                 //disable interrupt
                 IEC1bits.U2TXIE = 0;
                 write_cb(&cbSendToPc,temp_byte);
-                if(U2STAbits.UTXBF==0)
-                {
-                    char byte;
-                    int ret=read_cb(&cbSendToPc, &byte);
-                    if(ret==0)
-                    {
-                        U2TXREG = byte;
-                    }
-                }          
                 //enable interrupt
                 IEC1bits.U2TXIE = 1;
             }
@@ -749,6 +754,7 @@ int main(void) {
         }
          
         //Each 1Hz = 1000 ms blink D3 led
+        //Change state only 500ms
         if (blink_D3==1000)
         {
            LATBbits.LATB0 = !LATBbits.LATB0;
