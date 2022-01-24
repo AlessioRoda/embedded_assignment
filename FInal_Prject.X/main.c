@@ -1,6 +1,6 @@
-/*
+ /*
  * File:   newmainXC16.c
- * Author: aless
+ * Authors: Alessio Roda,Ermanno Girardo,Enzo Ubaldo Petrocco
  *
  * Created on 30 dicembre 2021, 10.32
  */
@@ -47,33 +47,30 @@
 #include "parser.h"
 #include <string.h>
 
-
-#define MAX_TASKS 4  //DA CAMBIARE!!!
-//Is important to do some calculatoins:
+//It is important to do some calculatoins:
 //If the baud rate is 9600 --> 9600bits/s are transferred into the communication channel
 //9600bits --> 1200 byte
-//Out main loop is 20ms (50Hz frequency)
+//Our main loop is 20ms (50Hz frequency)
 //In a single loop we can fill 1200/50=24 slot of the cb
 //In order to stay in the boundary we declare the cb capacity ceil(2*24) = 50
 //Considering that the firware may have to send to the pc up to 3 messages
-//The capacity of the cb is approximated to 60
-#define CIRCULAR_BUFFER_SIZE 60
-#define TEMP_CIRCULAR_BUFFER_SIZE 10
+//The capacity of the cb is approximated to 50
+
+#define CIRCULAR_BUFFER_SIZE 50
 
 ///////////////////////////GLOBAL VARIABLES/////////////////////////////////////
-float standby=0; 
-char* temp_message_ptr; 
-short int safe_mode = 0;
-short int display=0; //If 0 not pressed
-int velocity_r=0; 
-int velocity_l=0;
-
-typedef struct {
-int n;
-int N;
-} heartbeat;
+int standby=0;                                                                //
+char* temp_message_ptr;                                                       //
+short int safe_mode = 0;                                                      //
+short int display=0; //If 0 not pressed                                       //
+int velocity_r=0;                                                             //
+int velocity_l=0;                                                             //
+char ack_enable[4] = "ENA";                                                   //
+char ack_saturation[4] = "SAT";                                               //
+////////////////////////////////////////////////////////////////////////////////
 
 
+//Circular buffer struct
 typedef struct {
     char buffer[CIRCULAR_BUFFER_SIZE];
     int readIndex;
@@ -85,6 +82,7 @@ volatile circular_buffer_t circularBuffer;
 //Cb to send bytes to PC
 volatile circular_buffer_t cbSendToPc;
 
+//function to write into cb
 void write_cb(volatile circular_buffer_t* cb, char byte) {
     cb->buffer[cb->writeIndex] = byte;
     cb->writeIndex = (cb->writeIndex + 1) % CIRCULAR_BUFFER_SIZE;
@@ -94,6 +92,7 @@ void write_cb(volatile circular_buffer_t* cb, char byte) {
     }
 }
 
+//function to read from cb
 int read_cb(volatile circular_buffer_t* cb, char* byte) {
     if (cb->readIndex != cb->writeIndex) {
         *byte = cb->buffer[cb->readIndex];
@@ -106,6 +105,7 @@ int read_cb(volatile circular_buffer_t* cb, char* byte) {
     }
 }
 
+//function to count available bytes in cb
 int avl_bytes_cb(volatile circular_buffer_t* cb) {
     if (cb->readIndex <= cb->writeIndex) {
         return cb->writeIndex - cb->readIndex;
@@ -136,21 +136,21 @@ void __attribute__((__interrupt__,__auto_psv__)) _U2TXInterrupt(){
     }
 }
 
-    //ISR when the button S5 is pressed
+//ISR when the button S5 is pressed
 void __attribute__((__interrupt__,__auto_psv__)) _INT0Interrupt(){
     IFS0bits.INT0IF = 0; //turn off the flag
     safe_mode = 1;
     //Stop immediately the motors
-    //Setting velocity to zero
-    //Is equal to have duty cycle 50%
+    //Setting velocity to zero -->
+    // --> Is equal to have duty cycle 50%
     velocity_l = 0;
     velocity_r = 0;
+    //Update PWM
     PDC1 = 50 * 2 * PTPER;
     PDC2 = 50 * 2 * PTPER;
 }
 
-
-    //ISR when the button S6 is pressed
+//ISR when the button S6 is pressed
 void __attribute__((__interrupt__,__auto_psv__)) _INT1Interrupt(){
     IFS1bits.INT1IF = 0; //turn off the flag
    
@@ -192,103 +192,97 @@ void adc_configuration() {
     ADCON1bits.ADON = 1;    
 }
     
-    
-
-    int extract_message(const char* str, int* n1, int* n2)
+//function to extract the RPM values from a string
+//Format of the string: RPM_left,RPM_right
+//n1 and n2 could be saturation values for the motors
+int extract_message(const char* str, int* n1, int* n2)
+{
+    int len= strlen(str);
+    char string1[len];
+    char string2[len];
+    int i;
+    int j=0;
+    int flag =1;
+    for(i=0;i<len+1; i++)
     {
-        int len= strlen(str);
-        char string1[len];
-        char string2[len];
-       int k=0;
-       char prova[len];
-        for (; k<len; k++)
-        {
-            prova[k]=str[k];
+        if(str[i]==',')
+        { 
+            char string_to_send[i+1];
+            int k=0;
+            for(;k<i; k++)
+            {
+                string_to_send[k]=string1[k];
+            }
+            string_to_send[i]='\0';
+
+            flag= extract_integer(string_to_send, n1);
+
+            if(flag==-1)
+            {
+                return -1;
+            }
+            i++;
+            j=i;
         }
-       
-       char a,b,c;
-       a=prova[0];
-       b=prova[1];
-       c=prova[2];
-        
-        
-        int i;
-        int j=0;
-        int flag =1;
-        for(i=0;i<len+1; i++)
+
+        if(str[i]=='\0')
         {
-            if(str[i]==',')
+           // char* string_to_send= string2;
+            char string_to_send[i-j+1];
+            int k=0;
+            for(;k<i-j; k++)
             {
-                
-              // char* string_to_send= string1; 
-                char string_to_send[i+1];
-                int k=0;
-                for(;k<i; k++)
-                {
-                    string_to_send[k]=string1[k];
-                }
-                string_to_send[i]='\0';
-                
-                flag= extract_integer(string_to_send, n1);
-                
-                if(flag==-1)
-                {
-                    return -1;
-                }
-                i++;
-                j=i;
+                string_to_send[k]=string2[k];
             }
-            
-            if(str[i]=='\0')
+            string_to_send[i-j]='\0';
+            flag= extract_integer(string_to_send, n2);
+
+            if(flag==-1)
             {
-               // char* string_to_send= string2;
-                char string_to_send[i-j+1];
-                int k=0;
-                for(;k<i-j; k++)
-                {
-                    string_to_send[k]=string2[k];
-                }
-                string_to_send[i-j]='\0';
-                flag= extract_integer(string_to_send, n2);
-                
-                if(flag==-1)
-                {
-                    return -1;
-                }
-                
+                return -1;
             }
-            
-            if(flag==1)
-            {
-                string1[i]=str[i];
-                char c=string1[i];
-            }
-            else
-            {
-                string2[i-j]=str[i];
-            }
+
         }
-        
-        return 0;
+
+        if(flag==1)
+        {
+            string1[i]=str[i];
+        }
+        else
+        {
+            string2[i-j]=str[i];
+        }
     }
+
+    return 0;
+}
     
 
 //Function to send enable ack
-void send_ack(char* msg_type,int value){
+//if message type is 1 we want to send enable_ack
+//if message type is 0 we want to send saturation_ack
+void send_ack(int msg_type,int value){
     //Build message
     char message[15] = "$MCACK,";
-    char value_char = NULL;
+    char value_char[1];
     sprintf(value_char,"%i",value);
-    int j = 0;
-    char type[3];
-    for(;j<3;j++){
-        type[j] = (msg_type +j);
+    
+    if(msg_type==0)
+    {
+        strcat(message,ack_saturation);
     }
-    strcat(message,type);
+    else
+    {
+        strcat(message,ack_enable);
+    }
+    
     strcat(message,",");
     strcat(message,value_char);
     strcat(message,"*");
-    //Send to UART the message
+    //Write into the cb the string
+    //In order to do not wait the availability of the transmit register
+    //Polling once the availability
+    //Use _U2TXInterrupt in order to write to PC without waiting
     int k = 0;
     int str_len = strlen(message);
     for (;k<str_len;k++){
@@ -296,6 +290,16 @@ void send_ack(char* msg_type,int value){
         IEC1bits.U2TXIE = 0;
         //write on the buffer the characters
         write_cb(&cbSendToPc,message[k]);
+        //polling UART to send the message
+        if(U2STAbits.UTXBF==0)
+        {
+            char byte;
+            int ret=read_cb(&cbSendToPc, &byte);
+            if(ret==0)
+            {
+                U2TXREG = byte;
+            }
+        }
         //enable interrupt for transmission
         IEC1bits.U2TXIE = 1;
     }
@@ -303,7 +307,7 @@ void send_ack(char* msg_type,int value){
 
 
 
-//Feedback to PC
+//MCFBK ack to send via UART to the PC
 void send_MCFBK_ack(int n1,int n2){
     
     int state = 0;
@@ -318,7 +322,7 @@ void send_MCFBK_ack(int n1,int n2){
     {
         state=0;
     }
-    
+    //Build the message:
     char message[15] = "$MCFBK,";
     char value_char_n1[5] ;
     char value_char_n2[5];
@@ -333,42 +337,48 @@ void send_MCFBK_ack(int n1,int n2){
     strcat(message,",");
     strcat(message,state_msg);
     strcat(message,"*");
-    //Send to UART the message
+    //Write the message into the cb
     int k = 0;
     int str_len = strlen(message);
     for (;k<str_len;k++){
         //disable interrupt for transmission
         IEC1bits.U2TXIE = 0;
+        
         //write on the buffer the characters
         write_cb(&cbSendToPc,message[k]);
+        
+        //polling transmit UART register
+        if(U2STAbits.UTXBF==0)
+        {
+            char byte;
+            int ret=read_cb(&cbSendToPc, &byte);
+            if(ret==0)
+            {
+                U2TXREG = byte;
+            }
+        }
+        
         //enable interrupt for transmission
         IEC1bits.U2TXIE = 1;
     }
 }
 
-//Function to display the values on the LCD at the default mode 
+//Function to display the values on the LCD as default mode 
 void display_0(int temperature, int rpm_l, int rpm_r)
 {
-    //Check the state
-    //char state;
+    //build the message for the first row:
     char message[15]= "ST: ";
     if(safe_mode==1){
-        //state='H';
         strcat(message,"H");
     }
     else if(standby==1)
     {
-        //state='T';
         strcat(message,"T");
     }
     else
     {
-       //state='C';
         strcat(message,"C");
     }
-    
-    
-    //strcat(message,state);
     strcat(message,"; T: ");
     char temp_char[6];
     sprintf(temp_char, "%d", temperature);
@@ -379,6 +389,7 @@ void display_0(int temperature, int rpm_l, int rpm_r)
     spi_move_cursor(FIRST_ROW,0);
     spi_put_string(message);
     
+    //build the message for the second row
     char message2[15]= "R: ";
     char rpm_r_char[5];
     char rpm_l_char[5];
@@ -388,6 +399,7 @@ void display_0(int temperature, int rpm_l, int rpm_r)
     strcat(message2,"; ");
     strcat(message2,rpm_r_char);
     
+    //write in the second row
     spi_clear_second_row();
     spi_move_cursor(SECOND_ROW,0);
     spi_put_string(message2);
@@ -397,6 +409,7 @@ void display_0(int temperature, int rpm_l, int rpm_r)
 //Function to display the values on the LCD when the button S6 is pressed
 void display_1(int min, int max)
 {
+    //build the message for the first row
     char message[15]= "SA: ";
     char max_char[5];
     char min_char[5];
@@ -412,6 +425,7 @@ void display_1(int min, int max)
     spi_move_cursor(FIRST_ROW,0);
     spi_put_string(message);
     
+    //build the message for the second row
     char message2[15]= "R: ";
     char duty_char_1[5];
     char duty_char_2[5];
@@ -420,81 +434,92 @@ void display_1(int min, int max)
     strcat(message2,duty_char_1);
     strcat(message2,"; ");
     strcat(message2,duty_char_2);
+    //write in the second row
     spi_clear_second_row();
     spi_move_cursor(SECOND_ROW,0);
     spi_put_string(message2);
 }
 
-
-
+//main function of the project
+//Since no scheduling structure for tasks is implemented:
+//-The period of the main function is set to 20ms
+//This period is valid for two reasons:
+//1)The execution of main project is faster than 20ms
+//2)All the other tasks have periods that are multiples of the main one
+//-The variable main_period is the counter for the other tasks
 int main(void) {
     
     //first need to wait 1 second
     tmr_wait_ms(TIMER1, 1000);
-    
-    float duty_cycle_l;
-    float duty_cycle_r;
-    int max=9000;
-    int min=-9000;
-    int user_max=9000;
-    int user_min=-9000;
-    int avl;
-    int count;
-    int count_send_feedback=0;
-    int blink_D3=0;
-    int ret;
-    int main_period=20;
-    int temp_count=0;
-    float average;
-    short int sign_temp;
-    int average_count_loop = 0;
-    int send_average_count = 0;
-    float temperature_array[10];
-    char ack_enable[3] = "ENA";
-    char ack_saturation[3] = "SAT";
-    char* ack_en_ptr = &ack_enable[0];
-    char* ack_sat_ptr = &ack_saturation[0];
-    
-    
+    ////////////////////////LOCAL VARIABLES/////////////////////////////////////
+    float duty_cycle_l;                                                       //
+    float duty_cycle_r;                                                       //
+    int max=9000;                                                             //    
+    int min=-9000;                                                            //
+    int user_max=9000;                                                        //
+    int user_min=-9000;                                                       //
+    int avl;                                                                  //
+    int count;                                                                //
+    int count_send_feedback=0;                                                //
+    int blink_D3=0;                                                           //
+    int ret;                                                                  //
+    int main_period=20;                                                       //
+    int temp_count=0;                                                         //    
+    int standby_count=0;                                                      //
+    float average;                                                            //    
+    short int sign_temp;                                                      //
+    int average_count_loop = 0;                                               //    
+    int send_average_count = 0;                                               //        
+    float temperature_array[10];                                              //    
+                                                                              //
     ////////DECLARE THE LED D4 as OUTPUT////////////////////////////////////////
-    TRISBbits.TRISB1 = 0;
-    //Initialize LED D4 off                                                 //
-    LATBbits.LATB1 = 0; 
-    ////////DECLARE THE LED D3 as OUTPUT////////////////////////////////////////
-    TRISBbits.TRISB0 = 0;
-    //Initialize LED D3 off                                                 //
-    LATBbits.LATB0 = 0; 
+    TRISBbits.TRISB1 = 0;                                                     //                
+    //Initialize LED D4 off                                                   //
+    LATBbits.LATB1 = 0;                                                       //
+    ////////DECLARE THE LED D3 as OUTPUT////////////////////////////////////////   
+    TRISBbits.TRISB0 = 0;                                                     //
+    //Initialize LED D3 off                                                   //
+    LATBbits.LATB0 = 0;                                                       //
     ////////////////DECLARE BUTTON S5 as INPUT//////////////////////////////////
     TRISEbits.TRISE8 = 1; //button S5 as input                                //
-    TRISDbits.TRISD0 = 1; //button S6 as input  
-    //Initialize PWM////////////////////////////////////////////////////////////
-    PTPER = 1842; // 1 kHz
-    PTCONbits.PTMOD = 0; // free running
-    PTCONbits.PTCKPS = 0; // 1:1 prescaler
-    //PTCONbits.PTCKPS = 1; // 1:4 prescaler
-    PWMCON1bits.PEN2H = 1;
-    //PWMCON1bits.PEN2L = 1;
-    //NOTE THAT:
-    //PTPER should be 920.6
-    //1843,2 / 2 - 1 = 920.6
-    //This introduce a computational error
-    //Then when duty cycle is 100% the square wave is not exactly constant
-    //In this way duty cycle ~= 99.9%
-    //PTPER = 920; // 2 KHz
-    PTCONbits.PTEN = 1; // enable pwm
-    
-    //SPI initialization                                                      //
+    TRISDbits.TRISD0 = 1; //button S6 as input                                //
+    ////////////////////////INITIALIZE PWM//////////////////////////////////////   
+    PTPER = 1842; // 1 kHz                                                    //
+    PTCONbits.PTMOD = 0; // free running                                      //
+    PTCONbits.PTCKPS = 0; // 1:1 prescaler                                    //
+    //PTCONbits.PTCKPS = 1; // 1:4 prescaler                                  //
+    //High and Low of the first PWM signal                                    //
+    PWMCON1bits.PEN2H = 1;                                                    //
+    PWMCON1bits.PEN2L = 1;                                                    //
+    //High and Low of the second PWM signal                                   //
+    PWMCON1bits.PEN1H = 1;                                                    //
+    PWMCON1bits.PEN1L = 1;                                                    //
+    //It is important to use both the high and low part of the register       //
+    //because a dead time is needed to prevent short circuit of H bridge      //
+    //NOTE THAT:                                                              //    
+    //PTPER should be 920.6                                                   //    
+    //1843,2 / 2 - 1 = 920.6                                                  //    
+    //This introduce a computational error                                    //
+    //Then when duty cycle is 100% the square wave is not exactly constant    //
+    //In this way duty cycle ~= 99.9%                                         //    
+    //PTPER = 920; // 2 KHz                                                   //
+    PTCONbits.PTEN = 1; // enable pwm                                         //
+    DTCON1bits.DTA=9; //This gives about 5 micro seconds                      //
+    //Dead time prescaler                                                     //
+    DTCON1bits.DTAPS=0; //No approximation                                    //
+                                                                              //
+    ////////////////////SPI initialization//////////////////////////////////////
     SPI1CONbits.PPRE = 0b11;  // setup the primary prescaler to 1:1           //
     SPI1CONbits.SPRE = 0b110; // setup the secundary prescaler to 2:1         //
     //The two instructions above are needed becuase SPI works up to 1MHz      //
     SPI1CONbits.MSTEN = 1; //master                                           //
     SPI1CONbits.MODE16 = 0; // 8 bits                                         //
-    SPI1STATbits.SPIEN = 1; // enable   
-    
-    
-    //UART2 Initialization /////////////////////////////////////////////////////
+    SPI1STATbits.SPIEN = 1; // enable                                         //
+                                                                              //
+    //////////////////UART2 Initialization /////////////////////////////////////
                                                                               //             
-    U2BRG = 11; //set the baud rate register: (7372800 / 4) / (16 * 9600)-1   //
+    //U2BRG = 11; //set the baud rate register: (7372800 / 4) / (16 * 9600)-1 //
+    U2BRG = 23; //set the baud rate register: (7372800 / 4) / (16 * 4800)-1   //
     U2MODEbits.STSEL = 0; // 1 stop bit                                       //
     U2MODEbits.PDSEL = 0b00; // 8 bit no parity                               //
     U2MODEbits.UARTEN = 1; // UART enable                                     //
@@ -502,30 +527,11 @@ int main(void) {
     U2STAbits.UTXEN = 1; // unable transmission                               //
     // interrupt fires when at least one character can be written             //
     U2STAbits.UTXISEL = 0;                                                    //                                                                 
-            
-
-    // parser initialization////////////////////////////////////////////////////
+    //////////////PARSER INITIALIZATION/////////////////////////////////////////
     parser_state pstate;                                                      //
     pstate.state = STATE_DOLLAR;                                              //
     pstate.index_type = 0;                                                    //
     pstate.index_payload = 0;                                                 //
-    ////////////////////////////////////////////////////////////////////////////
-        
-    //////////////////Initialize PWM////////////////////////////////////////////
-    PTPER = 1842; // 1 kHz
-    PTCONbits.PTMOD = 0; // free running
-    PTCONbits.PTCKPS = 0; // 1:1 prescaler
-    //PTCONbits.PTCKPS = 1; // 1:4 prescaler
-    PWMCON1bits.PEN2H = 1;
-    PWMCON1bits.PEN2L = 1;
-    PWMCON1bits.PEN1H = 1;
-    PWMCON1bits.PEN1L = 1;
-    
-    DTCON1bits.DTA=9; //This gives about 5 micro seconds
-    //Dead time prescaler 
-    DTCON1bits.DTAPS=0; //No approximation 
-
-    PTCONbits.PTEN = 1; // enable pwm
     ////////////////////////////////////////////////////////////////////////////
     
     //////////////Enable all the interrupts/////////////////////////////////////
@@ -536,23 +542,25 @@ int main(void) {
     IEC0bits.INT0IE = 1;   //enable interrupt for button S5                   //
     IEC1bits.INT1IE =1;   //enable interrupt for button S6                    //
     ////////////////////////////////////////////////////////////////////////////
-       
+    
+    //setup the timer for the main project
     tmr_setup_period(TIMER1, main_period);
     
     while(1)
     {   
-        //In this section we read and convert from UART ////////////////////////
+        //In this section we read and convert from UART2////////////////////////
         //Disable the UART interrupt
         IEC1bits.U2RXIE = 0;
-        
-        standby+=main_period;
-        if(standby>=5000)
+        if(standby_count>=5000)
         {
             //Set velocity motors to zero
             velocity_r=0; 
             velocity_l=0;
+            standby=1;
        
-            //Blink LED D4                                                  
+            //Blink LED D4
+            //In this way D4 blinks at 50Hz
+            //We cannot visibly see the toggling but for our scope is ok
             LATBbits.LATB1 = !LATBbits.LATB1;
         }
        
@@ -565,7 +573,7 @@ int main(void) {
         //initialize a counter to compare the free space in cb
         count = 0;
         //while loop until we have available space in cb
-        while(count<avl && standby<5000){
+        while(count<avl && standby_count<5000){
             //variable to store the current byte in cb
             char byte;
             //disable UART interrupt
@@ -577,47 +585,52 @@ int main(void) {
             ret = parse_byte(&pstate, byte);
             //if a new message is acquired
             if (ret == NEW_MESSAGE){
-                // if the type of messagge is consistent
+                // if the type of messagge is consistent to HLREF
                 if(strcmp(pstate.msg_type, "HLREF") == 0 && safe_mode == 0){
-                    //then extract integer into the velocity
-                    //ret = extract_integer(pstate.msg_payload, &velocity);
+                    //then extract integers from the msg_payload
                     ret = extract_message(pstate.msg_payload, &velocity_l, &velocity_r);
                     // check if all goes well
                     if (ret == 0){
                         //Reset the counter for time out mode
-                        standby=0;
+                        standby_count=0;
+                        standby=0; //Turns off the stanby mode
                         LATBbits.LATB1 = 0; // Turn off the led
-                        // if the velocity is bigger than 1000 RPM saturate it
+                        // if the velocity is bigger than max saturate it
                         if(velocity_l > max){
                             //saturate to 1000 RPM
                             velocity_l = max;
                         }
-                        //if the velocity is 0 RPM limit it to 0
+                        //if the velocity is smaller than min saturate it
                         else if (velocity_l < min){
                             velocity_l = min;
                         }
                         
+                        //do them for the right motor
                         if(velocity_r > max){
-                            //saturate to 1000 RPM
+                            //saturate
                             velocity_r = max;
                         }
-                        //if the velocity is 0 RPM limit it to 0
+                    
                         else if (velocity_r < min){
                             velocity_r = min;
                         }
                         
                     }
                 }
+                // if the type of messagge is consistent to HLENA
                 if(strcmp(pstate.msg_type, "HLENA") == 0){
                     //disable S5 interrupt
                     IEC0bits.INT0IE = 0;
                     safe_mode = 0;
-                    send_ack(ack_en_ptr,1);
+                    send_ack(1,1); //Send enable ack, 1 as first argument
                     IEC0bits.INT0IE = 1;
                 }
+                 // if the type of messagge is consistent to HLSAT
                 if(strcmp(pstate.msg_type, "HLSAT") == 0)
                 {
+                    //acquire new saturation values
                     ret = extract_message(pstate.msg_payload, &user_min, &user_max);
+                    //check the consistency of the new saturation values
                     if (ret==0)
                     {
                         //Check that the values are in the correct range
@@ -626,11 +639,11 @@ int main(void) {
                             //Check that the min, max values are correctly set (i.e., min < max).
                             if(user_min<user_max)
                             {
-                                send_ack(ack_sat_ptr, 1);
+                                send_ack(0, 1); //Send positive saturation ack
                                 max=user_max;
                                 min=user_min;
                                 
-                                //Saturate velocities
+                                //Saturate velocities if necessary
                                 if(velocity_l > max){
                                     //saturate to 1000 RPM
                                     velocity_l = max;
@@ -651,22 +664,22 @@ int main(void) {
                                 
                             }
                             else{
-                                send_ack(ack_sat_ptr, 0);                                
+                                send_ack(0, 0);//Send negative saturation ack                                
                             }
                         }
                         else{
-                            send_ack(ack_sat_ptr, 0);
+                            send_ack(0, 0);//Send negative saturation ack
                         }
                     }
                 }
             }
+            //increment the counter
             count++;
         }
         
-         
-        
+        //In this section we have to generate the two PWM signals///////////////
         //Compute duty cycle
-        //Set the correct voltage vlaue on the basis of the RPM
+        //Set the correct voltage value on the basis of the RPM
         duty_cycle_l = 1.0/24000 * velocity_l + 0.5;
         duty_cycle_r = 1.0/24000 * velocity_r + 0.5;
         int duty_int_l = (int)(duty_cycle_l * 100);
@@ -677,7 +690,7 @@ int main(void) {
         sprintf(duty_char_r,"%i",duty_int_r);
         //apply the PWM
         //since main loop is 50Hz
-        //10 Hz refreshing task is satisfied
+        //10 Hz refreshing requisite is satisfied
         PDC1 = duty_cycle_l * 2 * PTPER;
         PDC2 = duty_cycle_r * 2 * PTPER;
         
@@ -686,10 +699,13 @@ int main(void) {
         double voltageTemp = adcValueTemp / 1024.0 * 5.0;
         double temperature = (voltageTemp - 0.75) * 100.0  + 25; //[Celsius]
          
+        //we have to acquire one temperature value each 100 ms
         if(average_count_loop == 100){
             temperature_array[temp_count]=temperature;
             temp_count+=1;
             average=0;
+            //if we have collected 10 values
+            //compute the temperature average
             if(temp_count==10)
             {
                 int k=0;
@@ -700,7 +716,6 @@ int main(void) {
                 }
                 average=sum/10;
                 temp_count=0;
-
 
                 sign_temp=0;
 
@@ -715,9 +730,11 @@ int main(void) {
             }
             average_count_loop = 0;
         }     
+        //each 1s we have to send to PC the temperature average
         if(send_average_count == 1000){
+            //build the message
             char temp_message[15] = "MCTEM,";
-            //Average of the tempearture in centi celsius in order to speed up 
+            //Average of the temperature in centi celsius in order to speed up 
             //the sprintf function
             int average_int = (int)(average * 100);
              
@@ -732,12 +749,23 @@ int main(void) {
             sprintf(current_char,"%i",average_int);
             strcat(temp_message,current_char);
             strcat(temp_message,"*");
+            //write the message into cb
             int q=0;
             for(;q<strlen(temp_message);q++){
                 char temp_byte=NULL;
                 //disable interrupt
                 IEC1bits.U2TXIE = 0;
                 write_cb(&cbSendToPc,temp_byte);
+                //polling UART2 transmit register
+                if(U2STAbits.UTXBF==0)
+                {
+                    char byte;
+                    int ret=read_cb(&cbSendToPc, &byte);
+                    if(ret==0)
+                    {
+                        U2TXREG = byte;
+                    }
+                }          
                 //enable interrupt
                 IEC1bits.U2TXIE = 1;
             }
@@ -754,7 +782,6 @@ int main(void) {
         }
          
         //Each 1Hz = 1000 ms blink D3 led
-        //Change state only 500ms
         if (blink_D3==500)
         {
            LATBbits.LATB0 = !LATBbits.LATB0;
@@ -774,14 +801,13 @@ int main(void) {
         IEC1bits.INT1IE =1;
         
         /////////////UPDATES COUNTER VARIABLES//////////////////////////////////
-        count_send_feedback+=main_period;
-        blink_D3+=main_period;
+        count_send_feedback += main_period;
+        blink_D3 += main_period;
         average_count_loop += main_period;
         send_average_count += main_period; 
+        standby_count += main_period;
         /////////////WAIT UNTIL main period is elapsed//////////////////////////
         tmr_wait_period(TIMER1);
     }
-    
-    
     return 0;
 }
