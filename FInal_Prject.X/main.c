@@ -168,12 +168,12 @@ void __attribute__((__interrupt__,__auto_psv__)) _INT1Interrupt(){
     
 //Analog to digital converter initialization
 void adc_configuration() {
-    ADCON3bits.ADCS = 8;
+    ADCON3bits.ADCS = 8; // Tad=8*Tcy
     //ADCON1bits.ASAM = 0; // manual sampling start
     ADCON1bits.ASAM = 1; // automatic sampling start
     //ADCON1bits.SSRC = 0; // manual conversion start
     ADCON1bits.SSRC = 7; // automatic conversion start
-    ADCON3bits.SAMC = 16; // fixed conversion time (Only if SSRC = 7)
+    ADCON3bits.SAMC = 16; // fixed conversion time (Only if SSRC = 7)--> 16* Tad
     //ADCON2bits.CHPS = 0; // CH0 only
     ADCON2bits.CHPS = 1; // CH0 & CH1
     ADCHSbits.CH0SA = 2; // AN2 connected to CH0
@@ -189,7 +189,7 @@ void adc_configuration() {
     /*ADCSSL = 0;
     ADCSSLbits.CSSL2 = 1; // scan AN2
     ADCSSLbits.CSSL3 = 1; // scan AN3 */
-    ADCON1bits.ADON = 1;    
+    ADCON1bits.ADON = 1;    //enable to start
 }
     
 //function to extract the RPM values from a string
@@ -505,6 +505,7 @@ int main(void) {
     //PTPER = 920; // 2 KHz                                                   //
     PTCONbits.PTEN = 1; // enable pwm                                         //
     DTCON1bits.DTA=9; //This gives about 5 micro seconds                      //
+    //DTA = DeadTime/(Prescaler * Tcy)                                        //
     //Dead time prescaler                                                     //
     DTCON1bits.DTAPS=0; //No approximation                                    //
                                                                               //
@@ -695,7 +696,7 @@ int main(void) {
         PDC2 = duty_cycle_r * 2 * PTPER;
         
         //////////// In this section read from AN3 for the temperature /////////
-        int adcValueTemp =ADCBUF1 ; // take the value from  ADC1 buffer 
+        int adcValueTemp = ADCBUF1 ; // take the value from  ADC1 buffer 
         double voltageTemp = adcValueTemp / 1024.0 * 5.0;
         double temperature = (voltageTemp - 0.75) * 100.0  + 25; //[Celsius]
          
